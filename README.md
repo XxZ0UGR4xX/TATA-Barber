@@ -62,6 +62,8 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 - **Barberos y servicios:** se crean automáticamente la primera vez en `db.js`. Para cambiarlos después, edítalos directamente en la base de datos, o borra `barberia.db` y ajusta la lista inicial en `db.js` antes de volver a arrancar.
 - **Horario de atención:** edita el objeto `HORARIO` al inicio de `server.js` (día de la semana → `['apertura','cierre']`, o `null` si cierran). El `PASO` controla cada cuántos minutos hay un turno. El horario del pie de página se actualiza solo con este objeto.
 - **Pie de página (dirección, teléfono, redes, correo):** edita el bloque marcado con ✏️ al final de `public/index.html`.
+- **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
+- **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
 
 ## 5. ¿Cómo se evita la doble reserva?
 
@@ -78,6 +80,8 @@ public/
   pago-demo.html Pasarela simulada (solo en modo demo)
   gracias.html   Confirmación tras el pago
   admin.html     Panel del administrador
+  productos.js   Productos de la tienda (ruleta)
+  img/           Imagen del encabezado y fotos de productos
   styles.css     Estilos
 .env.example     Plantilla de configuración
 ```
