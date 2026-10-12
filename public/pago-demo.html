@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pago (demo) · Tata Barber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand">TATA <span>BARBER</span></div></div></header>
+<main class="wrap" style="max-width:480px">
+  <section class="card" style="margin-top:40px">
+    <div class="msg info">Pago en modo demostración — no se realiza ningún cobro real. Para cobrar de verdad, configura Mercado Pago en el archivo <code>.env</code>.</div>
+    <h2>Pasarela de pago simulada</h2>
+    <dl class="summary" id="resumen"><dt>Cargando…</dt><dd></dd></dl>
+    <input id="tarjeta" placeholder="4242 4242 4242 4242" value="4242 4242 4242 4242" />
+    <div style="height:10px"></div>
+    <button class="btn" id="btn" style="width:100%">Pagar ahora</button>
+    <p id="err" class="muted"></p>
+  </section>
+</main>
+<script>
+const codigo = new URLSearchParams(location.search).get('codigo');
+const money = (n) => '$' + n + ' MXN';
+async function cargar() {
+  const r = await fetch('/api/demo/' + codigo);
+  if (!r.ok) { document.body.innerHTML = '<p style="padding:40px;text-align:center">Cita no encontrada.</p>'; return; }
+  const c = await r.json();
+  if (c.estado === 'pagada') { location.href = 'gracias.html?codigo=' + codigo; return; }
+  const f = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('resumen').innerHTML = `
+    <dt>Servicio</dt><dd>${c.servicio}</dd>
+    <dt>Barbero</dt><dd>${c.barbero}</dd>
+    <dt>Día</dt><dd style="text-transform:capitalize">${f} · ${c.hora}</dd>
+    <dt>Total</dt><dd>${money(c.precio)}</dd>`;
+}
+document.getElementById('btn').onclick = async () => {
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = 'Procesando…';
+  const r = await fetch('/api/demo/' + codigo + '/pagar', { method: 'POST' });
+  if (r.ok) location.href = 'gracias.html?codigo=' + codigo;
+  else { document.getElementById('err').textContent = 'No se pudo procesar. Intenta de nuevo.'; btn.disabled = false; btn.textContent = 'Pagar ahora'; }
+};
+cargar();
+</script>
+</body>
+</html>

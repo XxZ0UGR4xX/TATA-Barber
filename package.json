@@ -1,0 +1,28 @@
+{
+  "name": "tata-barber",
+  "version": "1.0.0",
+  "description": "Sistema de citas con pago en línea para Tata Barber",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "barberia",
+    "citas",
+    "mercadopago",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "mercadopago": "^3.6.1",
+    "nodemailer": "^10.1.0"
+  }
+}

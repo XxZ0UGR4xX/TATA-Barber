@@ -1,0 +1,48 @@
+# Despliegue en Render con un clic (Blueprint).
+# En render.com → New → Blueprint → conecta el repo con este archivo.
+# Luego llena las variables marcadas como sync:false en el panel de Render.
+services:
+  - type: web
+    name: tata-barber
+    runtime: node
+    plan: starter            # $7 USD/mes, siempre encendido. Cambia a 'free' para probar (se duerme).
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    # Disco persistente: aquí vive la base de datos de citas (no se borra en cada deploy)
+    disk:
+      name: datos
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DB_PATH
+        value: /data/barberia.db
+      # BASE_URL se autollenará con la URL pública de Render
+      - key: BASE_URL
+        fromService:
+          type: web
+          name: tata-barber
+          property: hostport
+      # El resto se llena a mano en el panel (por seguridad no van en el repo):
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASS
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true     # Render genera un secreto aleatorio automáticamente
+      - key: BARBERIA_EMAIL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false

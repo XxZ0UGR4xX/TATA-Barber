@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>¡Cita confirmada! · Tata Barber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="top"><div class="wrap"><div class="brand">TATA <span>BARBER</span></div></div></header>
+<main class="wrap" style="max-width:480px">
+  <section class="card" style="margin-top:40px; text-align:center">
+    <div style="font-size:3rem">✂️</div>
+    <h1 style="text-transform:uppercase">¡Cita confirmada!</h1>
+    <p class="muted" id="sub">Verificando tu pago…</p>
+    <dl class="summary" id="resumen" style="text-align:left; margin-top:20px"></dl>
+    <div id="code" class="hidden"><div class="msg ok">Tu código de cita: <b id="codigo-txt"></b></div></div>
+    <p class="muted hidden" id="mail-nota">Te enviamos la confirmación a tu correo. ¡Te esperamos!</p>
+    <a class="btn ghost" href="index.html" style="margin-top:10px">Agendar otra cita</a>
+  </section>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const money = (n) => '$' + n + ' MXN';
+function pinta(c) {
+  const f = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('sub').textContent = '¡Nos vemos pronto, ' + c.cliente + '!';
+  document.getElementById('resumen').innerHTML = `
+    <dt>Servicio</dt><dd>${c.servicio}</dd>
+    <dt>Barbero</dt><dd>${c.barbero}</dd>
+    <dt>Día</dt><dd style="text-transform:capitalize">${f}</dd>
+    <dt>Hora</dt><dd>${c.hora} (${c.duracion} min)</dd>
+    <dt>Pagado</dt><dd>${money(c.precio)}</dd>`;
+  document.getElementById('codigo-txt').textContent = c.codigo;
+  document.getElementById('code').classList.remove('hidden');
+  document.getElementById('mail-nota').classList.remove('hidden');
+}
+async function run() {
+  try {
+    // Mercado Pago regresa con payment_id (o collection_id) y status en la URL
+    const pid = params.get('payment_id') || params.get('collection_id');
+    const estadoMP = params.get('status') || params.get('collection_status');
+    let c, r;
+    if (pid) {
+      r = await fetch('/api/reservas/confirmar?payment_id=' + encodeURIComponent(pid));
+      c = await r.json();
+    } else if (params.get('codigo')) {
+      c = await (await fetch('/api/demo/' + params.get('codigo'))).json();
+    }
+    if (c && c.codigo && (c.estado === 'pagada' || (!r) || r.ok)) {
+      pinta(c);
+    } else if (estadoMP === 'pending' || estadoMP === 'in_process' || (c && c.estado && c.estado !== 'pagada')) {
+      // Pagos como OXXO o SPEI quedan pendientes hasta que se acreditan
+      document.getElementById('sub').textContent = 'Tu pago está en proceso. En cuanto se acredite, tu cita quedará confirmada y te llegará el correo.';
+      if (c && c.codigo) {
+        document.getElementById('codigo-txt').textContent = c.codigo;
+        document.getElementById('code').classList.remove('hidden');
+      }
+    } else {
+      document.getElementById('sub').textContent = 'No pudimos encontrar tu cita. Revisa tu correo o contáctanos.';
+    }
+  } catch { document.getElementById('sub').textContent = 'Hubo un problema al confirmar. Revisa tu correo.'; }
+}
+run();
+</script>
+</body>
+</html>

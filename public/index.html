@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tata Barber · Reserva tu cita</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand">TATA <span>BARBER</span></div>
+  <a class="btn ghost sm" href="admin.html">Administrador</a>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Reserva tu<br>corte en minutos</h1>
+    <p>Elige servicio, barbero, día y hora. Paga en línea y tu cita queda confirmada al instante.</p>
+  </section>
+
+  <div class="steps">
+    <span data-step="1" class="on">1 · Servicio</span>
+    <span data-step="2">2 · Barbero</span>
+    <span data-step="3">3 · Día y hora</span>
+    <span data-step="4">4 · Tus datos</span>
+    <span data-step="5">5 · Pago</span>
+  </div>
+
+  <div id="msg"></div>
+
+  <section class="card" id="box-servicio">
+    <h2>1 · Elige tu servicio</h2>
+    <div class="grid" id="servicios"></div>
+  </section>
+
+  <section class="card hidden" id="box-barbero">
+    <h2>2 · Elige tu barbero</h2>
+    <div class="grid" id="barberos"></div>
+  </section>
+
+  <section class="card hidden" id="box-fecha">
+    <h2>3 · Día y horario</h2>
+    <div class="days" id="dias"></div>
+    <div id="slots-wrap">
+      <p class="muted" id="slots-hint">Selecciona un día para ver los horarios.</p>
+      <div class="slots" id="slots"></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="box-datos">
+    <h2>4 · Tus datos</h2>
+    <div class="form-grid">
+      <div><label>Nombre completo</label><input id="f-nombre" autocomplete="name" placeholder="Juan Pérez" /></div>
+      <div><label>Correo electrónico</label><input id="f-email" type="email" autocomplete="email" placeholder="tucorreo@gmail.com" /></div>
+      <div><label>Teléfono (WhatsApp)</label><input id="f-tel" type="tel" autocomplete="tel" placeholder="449 123 4567" /></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="box-pago">
+    <h2>5 · Confirma y paga</h2>
+    <dl class="summary" id="resumen"></dl>
+    <button class="btn" id="btn-pagar">Pagar y agendar cita</button>
+    <p class="muted" id="pago-nota" style="margin-top:10px"></p>
+  </section>
+</main>
+
+<footer class="wrap">TATA BARBER · Aguascalientes · Pagos protegidos</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const money = (n) => '$' + n + ' MXN';
+const st = { servicio: null, barbero: null, fecha: null, hora: null, config: null };
+
+function msg(text, tipo = 'err') {
+  $('#msg').innerHTML = text ? `<div class="msg ${tipo}">${text}</div>` : '';
+  if (text) $('#msg').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function paso(n) {
+  document.querySelectorAll('.steps span').forEach((s) => s.classList.toggle('on', Number(s.dataset.step) <= n));
+}
+
+async function init() {
+  st.config = await (await fetch('/api/config')).json();
+  // Servicios
+  $('#servicios').innerHTML = st.config.servicios.map((s) => `
+    <button class="opt" data-id="${s.id}">
+      <div class="t">${s.nombre}</div>
+      <div class="s">${s.descripcion || ''} · ${s.duracion} min</div>
+      <div class="p">${money(s.precio)}</div>
+    </button>`).join('');
+  // Barberos
+  $('#barberos').innerHTML = st.config.barberos.map((b) => `
+    <button class="opt" data-id="${b.id}">
+      <div class="avatar">${b.nombre[0]}</div>
+      <div class="t">${b.nombre}</div>
+      <div class="s">${b.especialidad || ''}</div>
+    </button>`).join('');
+  construirDias();
+
+  $('#servicios').onclick = (e) => pick(e, 'servicio', st.config.servicios, () => { show('#box-barbero'); paso(2); });
+  $('#barberos').onclick = (e) => pick(e, 'barbero', st.config.barberos, () => { show('#box-fecha'); paso(3); cargarSlots(); });
+  if (new URLSearchParams(location.search).get('cancelado')) msg('Cancelaste el pago. Tu horario sigue disponible, puedes intentar de nuevo.', 'info');
+}
+
+function pick(e, key, lista, luego) {
+  const btn = e.target.closest('.opt'); if (!btn) return;
+  btn.parentElement.querySelectorAll('.opt').forEach((o) => o.classList.remove('sel'));
+  btn.classList.add('sel');
+  st[key] = lista.find((x) => x.id === Number(btn.dataset.id));
+  if (key === 'servicio' || key === 'barbero') { st.hora = null; }
+  luego();
+  actualizarResumen();
+}
+function show(sel) { $(sel).classList.remove('hidden'); }
+
+function construirDias() {
+  const cont = $('#dias'); cont.innerHTML = '';
+  const hoy = new Date(st.config.hoy + 'T12:00:00');
+  const dOut = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  for (let i = 0; i < 21; i++) {
+    const d = new Date(hoy); d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const cerrado = st.config.diasCerrados.includes(d.getDay());
+    const b = document.createElement('button');
+    b.className = 'day'; b.disabled = cerrado; b.dataset.fecha = iso;
+    b.innerHTML = `<small>${dOut[d.getDay()]}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('es-MX',{month:'short'})}</small>`;
+    b.onclick = () => {
+      cont.querySelectorAll('.day').forEach((x) => x.classList.remove('sel'));
+      b.classList.add('sel'); st.fecha = iso; st.hora = null; cargarSlots(); actualizarResumen();
+    };
+    cont.appendChild(b);
+  }
+}
+
+async function cargarSlots() {
+  if (!st.servicio || !st.barbero || !st.fecha) return;
+  $('#slots-hint').textContent = 'Cargando horarios…';
+  $('#slots').innerHTML = '';
+  const q = new URLSearchParams({ barbero: st.barbero.id, servicio: st.servicio.id, fecha: st.fecha });
+  const r = await fetch('/api/disponibilidad?' + q);
+  const data = await r.json();
+  if (!data.slots || !data.slots.length) { $('#slots-hint').textContent = 'No hay horarios disponibles ese día. Prueba otro.'; return; }
+  const libres = data.slots.filter((s) => s.disponible).length;
+  $('#slots-hint').textContent = libres ? `${libres} horarios disponibles:` : 'Todo ocupado ese día. Prueba otro.';
+  $('#slots').innerHTML = data.slots.map((s) =>
+    `<button class="slot" data-hora="${s.hora}" ${s.disponible ? '' : 'disabled'}>${s.hora}</button>`).join('');
+  $('#slots').onclick = (e) => {
+    const b = e.target.closest('.slot'); if (!b || b.disabled) return;
+    $('#slots').querySelectorAll('.slot').forEach((x) => x.classList.remove('sel'));
+    b.classList.add('sel'); st.hora = b.dataset.hora;
+    show('#box-datos'); paso(4); actualizarResumen();
+  };
+}
+
+function datosCliente() {
+  return { nombre: $('#f-nombre').value.trim(), email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim() };
+}
+function actualizarResumen() {
+  if (!(st.servicio && st.barbero && st.fecha && st.hora)) return;
+  const f = new Date(st.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+  $('#resumen').innerHTML = `
+    <dt>Servicio</dt><dd>${st.servicio.nombre}</dd>
+    <dt>Barbero</dt><dd>${st.barbero.nombre}</dd>
+    <dt>Día</dt><dd style="text-transform:capitalize">${f}</dd>
+    <dt>Hora</dt><dd>${st.hora} (${st.servicio.duracion} min)</dd>
+    <dt>Total</dt><dd>${money(st.servicio.precio)}</dd>`;
+  show('#box-pago'); paso(5);
+  $('#pago-nota').textContent = st.config.demo
+    ? 'Modo demostración: el pago se simula (no se cobra nada real).'
+    : 'Serás redirigido a la pasarela de pago segura.';
+}
+
+['#f-nombre','#f-email','#f-tel'].forEach((s) => document.addEventListener('input', (e)=>{ if(e.target.matches(s)) {} }));
+
+$('#btn-pagar').onclick = async () => {
+  const d = datosCliente();
+  if (!d.nombre || !d.email || !d.telefono) return msg('Completa tu nombre, correo y teléfono.');
+  if (!(st.servicio && st.barbero && st.fecha && st.hora)) return msg('Completa todos los pasos.');
+  msg('');
+  $('#btn-pagar').disabled = true; $('#btn-pagar').textContent = 'Procesando…';
+  try {
+    const r = await fetch('/api/reservas', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...d, barberoId: st.barbero.id, servicioId: st.servicio.id, fecha: st.fecha, hora: st.hora }),
+    });
+    const data = await r.json();
+    if (!r.ok) { msg(data.error || 'No se pudo reservar.'); if (r.status === 409) cargarSlots(); return; }
+    location.href = data.url;
+  } catch { msg('Error de conexión. Intenta de nuevo.'); }
+  finally { $('#btn-pagar').disabled = false; $('#btn-pagar').textContent = 'Pagar y agendar cita'; }
+};
+
+init().catch(() => msg('No se pudo cargar la información. Recarga la página.'));
+</script>
+</body>
+</html>

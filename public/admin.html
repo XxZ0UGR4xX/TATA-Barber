@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Administrador · Tata Barber</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand">TATA <span>BARBER</span> · Admin</div>
+  <div>
+    <a class="btn ghost sm" href="index.html">Ver sitio</a>
+    <button class="btn ghost sm hidden" id="btn-logout">Cerrar sesión</button>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <!-- Login -->
+  <section class="card login-box" id="login">
+    <h2>Acceso de administrador</h2>
+    <div id="login-msg"></div>
+    <label>Usuario</label><input id="usuario" autocomplete="username" />
+    <div style="height:10px"></div>
+    <label>Contraseña</label><input id="password" type="password" autocomplete="current-password" />
+    <div style="height:16px"></div>
+    <button class="btn" id="btn-login" style="width:100%">Entrar</button>
+  </section>
+
+  <!-- Panel -->
+  <section id="panel" class="hidden">
+    <h1 style="text-transform:uppercase; margin-top:10px">Panel de citas</h1>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <h2>Citas por barbero</h2>
+      <div id="por-barbero"></div>
+    </div>
+
+    <div class="card">
+      <h2>Todas las citas</h2>
+      <div class="filters">
+        <div><label>Barbero</label><select id="f-barbero"><option value="">Todos</option></select></div>
+        <div><label>Estado</label><select id="f-estado">
+          <option value="">Pagadas y canceladas</option>
+          <option value="pagada">Solo pagadas</option>
+          <option value="cancelada">Solo canceladas</option>
+        </select></div>
+        <div><label>Desde</label><input type="date" id="f-desde" /></div>
+        <div><label>Hasta</label><input type="date" id="f-hasta" /></div>
+        <div><button class="btn sm" id="btn-filtrar">Filtrar</button></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Código</th><th>Cliente</th><th>Contacto</th><th>Servicio</th>
+            <th>Barbero</th><th>Día</th><th>Hora</th><th>Pago</th><th>Estado</th><th></th>
+          </tr></thead>
+          <tbody id="tbody"><tr><td colspan="10" class="muted">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const money = (n) => '$' + n + ' MXN';
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fechaCorta = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'short', day:'numeric', month:'short' });
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  if (r.status === 401) { mostrarLogin(); throw new Error('no-auth'); }
+  return r;
+}
+function mostrarLogin() { $('#login').classList.remove('hidden'); $('#panel').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
+function mostrarPanel() { $('#login').classList.add('hidden'); $('#panel').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); cargarTodo(); }
+
+$('#btn-login').onclick = async () => {
+  $('#login-msg').innerHTML = '';
+  const r = await fetch('/api/admin/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ usuario: $('#usuario').value, password: $('#password').value }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.ok) mostrarPanel();
+  else $('#login-msg').innerHTML = `<div class="msg err">${esc(data.error || 'Error')}</div>`;
+};
+$('#password').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-login').click(); });
+$('#btn-logout').onclick = async () => { await fetch('/api/admin/logout', { method: 'POST' }); mostrarLogin(); };
+
+async function cargarTodo() { await Promise.all([cargarResumen(), cargarCitas()]); }
+
+async function cargarResumen() {
+  const d = await (await api('/api/admin/resumen')).json();
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="n">${d.hoy}</div><div class="l">Citas hoy</div></div>
+    <div class="stat"><div class="n">${d.proximas}</div><div class="l">Próximas</div></div>
+    <div class="stat"><div class="n">${d.pagadas}</div><div class="l">Pagadas (total)</div></div>
+    <div class="stat"><div class="n">${money(d.ingresos)}</div><div class="l">Ingresos</div></div>
+    <div class="stat"><div class="n">${d.canceladas}</div><div class="l">Canceladas</div></div>`;
+  const max = Math.max(1, ...d.porBarbero.map((b) => b.citas));
+  $('#por-barbero').innerHTML = d.porBarbero.map((b) => `
+    <div style="margin:10px 0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span><b>${esc(b.barbero)}</b> · ${b.citas} citas</span>
+        <span class="muted">${money(b.ingresos)}</span>
+      </div>
+      <div class="bar"><i style="width:${(b.citas / max) * 100}%"></i></div>
+    </div>`).join('') || '<p class="muted">Aún no hay citas.</p>';
+
+  // Rellenar filtro de barberos una sola vez
+  if ($('#f-barbero').options.length <= 1) {
+    const cfg = await (await fetch('/api/config')).json();
+    cfg.barberos.forEach((b) => $('#f-barbero').add(new Option(b.nombre, b.id)));
+  }
+}
+
+async function cargarCitas() {
+  const q = new URLSearchParams();
+  if ($('#f-barbero').value) q.set('barbero', $('#f-barbero').value);
+  if ($('#f-estado').value) q.set('estado', $('#f-estado').value);
+  if ($('#f-desde').value) q.set('desde', $('#f-desde').value);
+  if ($('#f-hasta').value) q.set('hasta', $('#f-hasta').value);
+  const { citas } = await (await api('/api/admin/citas?' + q)).json();
+  if (!citas.length) { $('#tbody').innerHTML = '<tr><td colspan="10" class="muted">No hay citas con esos filtros.</td></tr>'; return; }
+  $('#tbody').innerHTML = citas.map((c) => `
+    <tr>
+      <td><b>${esc(c.codigo)}</b></td>
+      <td>${esc(c.cliente_nombre)}</td>
+      <td class="muted">${esc(c.cliente_tel)}<br><small>${esc(c.cliente_email)}</small></td>
+      <td>${esc(c.servicio)}</td>
+      <td>${esc(c.barbero)}</td>
+      <td style="text-transform:capitalize">${fechaCorta(c.fecha)}</td>
+      <td>${esc(c.hora)}</td>
+      <td>${money(c.precio)}</td>
+      <td><span class="badge ${c.estado}">${c.estado}</span></td>
+      <td>${c.estado === 'pagada' ? `<button class="btn danger sm" data-cancelar="${c.id}">Cancelar</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+$('#btn-filtrar').onclick = cargarCitas;
+$('#tbody').onclick = async (e) => {
+  const b = e.target.closest('[data-cancelar]'); if (!b) return;
+  if (!confirm('¿Cancelar esta cita? El horario quedará libre.')) return;
+  await api(`/api/admin/citas/${b.dataset.cancelar}/cancelar`, { method: 'POST' });
+  cargarTodo();
+};
+
+// ¿Ya hay sesión activa?
+(async () => {
+  const { activa } = await (await fetch('/api/admin/sesion')).json();
+  activa ? mostrarPanel() : mostrarLogin();
+})();
+</script>
+</body>
+</html>
