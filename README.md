@@ -60,7 +60,8 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 ## 4. Personalizar barberos, servicios y horario
 
 - **Barberos y servicios:** se crean automáticamente la primera vez en `db.js`. Para cambiarlos después, edítalos directamente en la base de datos, o borra `barberia.db` y ajusta la lista inicial en `db.js` antes de volver a arrancar.
-- **Horario de atención:** edita el objeto `HORARIO` al inicio de `server.js` (día de la semana → `['apertura','cierre']`, o `null` si cierran). El `PASO` controla cada cuántos minutos hay un turno.
+- **Horario de atención:** edita el objeto `HORARIO` al inicio de `server.js` (día de la semana → `['apertura','cierre']`, o `null` si cierran). El `PASO` controla cada cuántos minutos hay un turno. El horario del pie de página se actualiza solo con este objeto.
+- **Pie de página (dirección, teléfono, redes, correo):** edita el bloque marcado con ✏️ al final de `public/index.html`.
 
 ## 5. ¿Cómo se evita la doble reserva?
 

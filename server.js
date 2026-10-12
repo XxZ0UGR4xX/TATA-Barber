@@ -149,6 +149,7 @@ app.get('/api/config', (req, res) => {
     barberos: db.prepare('SELECT id, nombre, especialidad FROM barberos WHERE activo = 1').all(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
     diasCerrados: Object.keys(HORARIO).filter((d) => !HORARIO[d]).map(Number),
+    horario: HORARIO,
     demo: MODO_DEMO,
     hoy: ahoraMX().fecha,
   });
