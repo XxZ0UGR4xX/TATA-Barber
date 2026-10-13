@@ -13,7 +13,7 @@
 <main class="wrap" style="max-width:480px">
   <section class="card" style="margin-top:40px; text-align:center">
     <div style="font-size:3rem">✂️</div>
-    <h1 style="text-transform:uppercase">¡Cita confirmada!</h1>
+    <h1 style="text-transform:uppercase" id="titulo">Tu cita</h1>
     <p class="muted" id="sub">Verificando tu pago…</p>
     <dl class="summary" id="resumen" style="text-align:left; margin-top:20px"></dl>
     <div id="code" class="hidden"><div class="msg ok">Tu código de cita: <b id="codigo-txt"></b></div></div>
@@ -24,7 +24,13 @@
 <script>
 const params = new URLSearchParams(location.search);
 const money = (n) => '$' + n + ' MXN';
+const titulo = (t) => { document.getElementById('titulo').textContent = t; };
+const codigo = (c) => {
+  document.getElementById('codigo-txt').textContent = c.codigo;
+  document.getElementById('code').classList.remove('hidden');
+};
 function pinta(c) {
+  titulo('¡Cita confirmada!');
   const f = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
   document.getElementById('sub').textContent = '¡Nos vemos pronto, ' + c.cliente + '!';
   document.getElementById('resumen').innerHTML = `
@@ -33,8 +39,7 @@ function pinta(c) {
     <dt>Día</dt><dd style="text-transform:capitalize">${f}</dd>
     <dt>Hora</dt><dd>${c.hora} (${c.duracion} min)</dd>
     <dt>Pagado</dt><dd>${money(c.precio)}</dd>`;
-  document.getElementById('codigo-txt').textContent = c.codigo;
-  document.getElementById('code').classList.remove('hidden');
+  codigo(c);
   document.getElementById('mail-nota').classList.remove('hidden');
 }
 async function run() {
@@ -49,19 +54,23 @@ async function run() {
     } else if (params.get('codigo')) {
       c = await (await fetch('/api/demo/' + params.get('codigo'))).json();
     }
-    if (c && c.codigo && (c.estado === 'pagada' || (!r) || r.ok)) {
+    if (c && c.codigo && c.estado === 'conflicto') {
+      // Pagó, pero el horario se ocupó mientras pagaba: la barbería lo contacta
+      titulo('Recibimos tu pago');
+      document.getElementById('sub').textContent = 'Pero ese horario se ocupó mientras pagabas. Te contactaremos para reagendar tu cita o devolverte tu dinero.';
+      codigo(c);
+    } else if (c && c.codigo && (c.estado === 'pagada' || (!r) || r.ok)) {
       pinta(c);
     } else if (estadoMP === 'pending' || estadoMP === 'in_process' || (c && c.estado && c.estado !== 'pagada')) {
       // Pagos como OXXO o SPEI quedan pendientes hasta que se acreditan
-      document.getElementById('sub').textContent = 'Tu pago está en proceso. En cuanto se acredite, tu cita quedará confirmada y te llegará el correo.';
-      if (c && c.codigo) {
-        document.getElementById('codigo-txt').textContent = c.codigo;
-        document.getElementById('code').classList.remove('hidden');
-      }
+      titulo('Pago en proceso');
+      document.getElementById('sub').textContent = 'En cuanto se acredite tu pago, tu cita quedará confirmada y te llegará el correo.';
+      if (c && c.codigo) codigo(c);
     } else {
+      titulo('No encontramos tu cita');
       document.getElementById('sub').textContent = 'No pudimos encontrar tu cita. Revisa tu correo o contáctanos.';
     }
-  } catch { document.getElementById('sub').textContent = 'Hubo un problema al confirmar. Revisa tu correo.'; }
+  } catch { titulo('Tu cita'); document.getElementById('sub').textContent = 'Hubo un problema al confirmar. Revisa tu correo.'; }
 }
 run();
 </script>

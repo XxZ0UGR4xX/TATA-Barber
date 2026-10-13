@@ -79,4 +79,31 @@ async function confirmarCliente(cita) {
   });
 }
 
-module.exports = { avisarBarberia, confirmarCliente };
+// Pago recibido pero el horario ya no estaba disponible (se ocupó, se canceló o ya pasó)
+async function avisarConflicto(cita) {
+  const to = process.env.BARBERIA_EMAIL;
+  if (!to) return console.log('[correo] BARBERIA_EMAIL no definido');
+  const nota = 'El cliente pagó, pero ese horario ya no estaba disponible. Contáctalo para reagendar ' +
+    'o devuélvele el pago desde tu cuenta de Mercado Pago. La cita aparece como "Por revisar" en el panel.';
+  await enviar({
+    to,
+    subject: `⚠ Pago sin horario: ${cita.cliente_nombre} · ${cita.fecha} ${cita.hora} · ${cita.barbero_nombre}`,
+    text: `${nota}\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    html: `<h2 style="font-family:Arial,sans-serif">Pago recibido sin horario disponible</h2>
+           <p style="font-family:Arial,sans-serif">${esc(nota)}</p>${tablaHtml(cita)}`,
+  });
+}
+
+async function conflictoCliente(cita) {
+  const nota = 'Recibimos tu pago, pero ese horario se ocupó mientras pagabas. ' +
+    'Nos pondremos en contacto contigo para reagendar tu cita o devolverte tu dinero.';
+  await enviar({
+    to: cita.cliente_email,
+    subject: `Recibimos tu pago · Vamos a reagendar tu cita`,
+    text: `Hola ${cita.cliente_nombre}. ${nota}\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    html: `<h2 style="font-family:Arial,sans-serif">Hola ${esc(cita.cliente_nombre)}, recibimos tu pago</h2>
+           <p style="font-family:Arial,sans-serif">${esc(nota)}</p>${tablaHtml(cita)}`,
+  });
+}
+
+module.exports = { avisarBarberia, confirmarCliente, avisarConflicto, conflictoCliente };

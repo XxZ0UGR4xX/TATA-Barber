@@ -102,14 +102,36 @@ function citaCompleta(where, ...params) {
     WHERE ${where}`).get(...params);
 }
 
-// Marca la cita como pagada (idempotente) y manda los correos solo la primera vez
+// Registra el pago de una cita una sola vez. Si mientras se pagaba el horario lo ganó otra cita pagada,
+// la cita estaba cancelada o la hora ya pasó (p. ej. un OXXO pagado tarde), NO se agenda: queda en
+// 'conflicto' para que la barbería reagende o devuelva el dinero. Devuelve el estado nuevo o null.
+const registrarPago = db.transaction((citaId) => {
+  const c = db.prepare('SELECT * FROM citas WHERE id = ?').get(citaId);
+  if (!c || c.pagada_en) return null; // no existe o este pago ya se registró (MP avisa varias veces)
+  const ini = toMin(c.hora), fin = ini + c.duracion;
+  const choca = db.prepare(`SELECT hora, duracion FROM citas
+                            WHERE id != ? AND barbero_id = ? AND fecha = ? AND estado = 'pagada'`)
+    .all(c.id, c.barbero_id, c.fecha)
+    .some((o) => ini < toMin(o.hora) + o.duracion && fin > toMin(o.hora));
+  const ahora = ahoraMX();
+  const yaPaso = c.fecha < ahora.fecha || (c.fecha === ahora.fecha && ini <= ahora.min);
+  const estado = c.estado === 'cancelada' || choca || yaPaso ? 'conflicto' : 'pagada';
+  db.prepare("UPDATE citas SET estado = ?, pagada_en = datetime('now') WHERE id = ?").run(estado, c.id);
+  return estado;
+});
+
+// Marca la cita como pagada y manda los correos solo la primera vez
 async function marcarPagada(citaId) {
-  const r = db.prepare(`UPDATE citas SET estado='pagada', pagada_en=datetime('now')
-                        WHERE id = ? AND estado != 'pagada'`).run(citaId);
+  const estado = registrarPago(citaId);
   const cita = citaCompleta('c.id = ?', citaId);
-  if (cita && r.changes === 1) {
-    mail.avisarBarberia(cita).catch((e) => console.error('[correo barbería]', e.message));
-    mail.confirmarCliente(cita).catch((e) => console.error('[correo cliente]', e.message));
+  const log = (quien) => (e) => console.error(`[correo ${quien}]`, e.message);
+  if (cita && estado === 'pagada') {
+    mail.avisarBarberia(cita).catch(log('barbería'));
+    mail.confirmarCliente(cita).catch(log('cliente'));
+  } else if (cita && estado === 'conflicto') {
+    console.warn(`[pago] Cita ${cita.codigo} pagada sin horario disponible: queda por revisar.`);
+    mail.avisarConflicto(cita).catch(log('barbería'));
+    mail.conflictoCliente(cita).catch(log('cliente'));
   }
   return cita;
 }
@@ -225,7 +247,8 @@ app.post('/api/reservas', async (req, res) => {
         ...(BASE_URL.startsWith('https') ? { auto_return: 'approved' } : {}),
         notification_url: `${BASE_URL}/api/mp/webhook`,
         expires: true,
-        expiration_date_to: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        // El enlace de pago dura lo mismo que el apartado del horario
+        expiration_date_to: new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString(),
       },
     });
     db.prepare('UPDATE citas SET mp_preference_id = ? WHERE id = ?').run(pref.id, citaId);
@@ -317,8 +340,7 @@ app.get('/api/admin/citas', requireAdmin, (req, res) => {
   const { barbero, desde, hasta, estado } = req.query;
   const cond = ["c.estado != 'pendiente'"]; // las pendientes son intentos sin pagar
   const params = [];
-  if (estado === 'cancelada') { cond[0] = "c.estado = 'cancelada'"; }
-  else if (estado === 'pagada') { cond[0] = "c.estado = 'pagada'"; }
+  if (['pagada', 'cancelada', 'conflicto'].includes(estado)) { cond[0] = 'c.estado = ?'; params.push(estado); }
   if (barbero) { cond.push('c.barbero_id = ?'); params.push(Number(barbero)); }
   if (desde && fechaValida(desde)) { cond.push('c.fecha >= ?'); params.push(desde); }
   if (hasta && fechaValida(hasta)) { cond.push('c.fecha <= ?'); params.push(hasta); }
@@ -336,6 +358,7 @@ app.get('/api/admin/resumen', requireAdmin, (req, res) => {
   const tot = db.prepare(`SELECT
       COUNT(*) FILTER (WHERE estado='pagada') AS pagadas,
       COUNT(*) FILTER (WHERE estado='cancelada') AS canceladas,
+      COUNT(*) FILTER (WHERE estado='conflicto') AS revisar,
       COALESCE(SUM(precio) FILTER (WHERE estado='pagada'),0) AS ingresos,
       COUNT(*) FILTER (WHERE estado='pagada' AND fecha = ?) AS hoy,
       COUNT(*) FILTER (WHERE estado='pagada' AND fecha > ?) AS proximas
@@ -344,7 +367,7 @@ app.get('/api/admin/resumen', requireAdmin, (req, res) => {
     SELECT b.nombre AS barbero, COUNT(c.id) AS citas, COALESCE(SUM(c.precio),0) AS ingresos
     FROM barberos b LEFT JOIN citas c ON c.barbero_id = b.id AND c.estado = 'pagada'
     GROUP BY b.id ORDER BY citas DESC`).all();
-  res.json({ ...tot, porBarbero, hoy: hoy });
+  res.json({ ...tot, porBarbero, fecha: hoy }); // `hoy` es el número de citas de hoy
 });
 
 app.post('/api/admin/citas/:id/cancelar', requireAdmin, (req, res) => {

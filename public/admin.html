@@ -45,8 +45,9 @@
       <div class="filters">
         <div><label>Barbero</label><select id="f-barbero"><option value="">Todos</option></select></div>
         <div><label>Estado</label><select id="f-estado">
-          <option value="">Pagadas y canceladas</option>
+          <option value="">Todas</option>
           <option value="pagada">Solo pagadas</option>
+          <option value="conflicto">Por revisar</option>
           <option value="cancelada">Solo canceladas</option>
         </select></div>
         <div><label>Desde</label><input type="date" id="f-desde" /></div>
@@ -70,6 +71,7 @@
 const $ = (s) => document.querySelector(s);
 const money = (n) => '$' + n + ' MXN';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ESTADOS = { pagada: 'Pagada', cancelada: 'Cancelada', conflicto: 'Por revisar' };
 const fechaCorta = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'short', day:'numeric', month:'short' });
 
 async function api(url, opts) {
@@ -97,7 +99,9 @@ async function cargarTodo() { await Promise.all([cargarResumen(), cargarCitas()]
 
 async function cargarResumen() {
   const d = await (await api('/api/admin/resumen')).json();
-  $('#stats').innerHTML = `
+  $('#stats').innerHTML = (d.revisar ? `
+    <button class="stat alerta" data-ver="conflicto" title="Pagaron pero su horario ya no estaba libre: reagenda o devuelve el pago">
+      <div class="n">${d.revisar}</div><div class="l">Por revisar</div></button>` : '') + `
     <div class="stat"><div class="n">${d.hoy}</div><div class="l">Citas hoy</div></div>
     <div class="stat"><div class="n">${d.proximas}</div><div class="l">Próximas</div></div>
     <div class="stat"><div class="n">${d.pagadas}</div><div class="l">Pagadas (total)</div></div>
@@ -138,15 +142,24 @@ async function cargarCitas() {
       <td style="text-transform:capitalize">${fechaCorta(c.fecha)}</td>
       <td>${esc(c.hora)}</td>
       <td>${money(c.precio)}</td>
-      <td><span class="badge ${c.estado}">${c.estado}</span></td>
-      <td>${c.estado === 'pagada' ? `<button class="btn danger sm" data-cancelar="${c.id}">Cancelar</button>` : ''}</td>
+      <td><span class="badge ${c.estado}">${ESTADOS[c.estado] || esc(c.estado)}</span></td>
+      <td>${c.estado === 'pagada' || c.estado === 'conflicto'
+        ? `<button class="btn danger sm" data-cancelar="${c.id}" data-estado="${c.estado}">Cancelar</button>` : ''}</td>
     </tr>`).join('');
 }
 
 $('#btn-filtrar').onclick = cargarCitas;
+$('#stats').onclick = (e) => {
+  const b = e.target.closest('[data-ver]'); if (!b) return;
+  $('#f-estado').value = b.dataset.ver; cargarCitas();
+  $('#tbody').scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
 $('#tbody').onclick = async (e) => {
   const b = e.target.closest('[data-cancelar]'); if (!b) return;
-  if (!confirm('¿Cancelar esta cita? El horario quedará libre.')) return;
+  const aviso = b.dataset.estado === 'conflicto'
+    ? '¿Marcar como resuelta y cancelar? Recuerda devolver el pago desde Mercado Pago si no la reagendaste.'
+    : '¿Cancelar esta cita? El horario quedará libre.';
+  if (!confirm(aviso)) return;
   await api(`/api/admin/citas/${b.dataset.cancelar}/cancelar`, { method: 'POST' });
   cargarTodo();
 };

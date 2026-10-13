@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS citas (
   hora TEXT NOT NULL,               -- HH:MM
   duracion INTEGER NOT NULL,
   precio INTEGER NOT NULL,
-  estado TEXT NOT NULL DEFAULT 'pendiente',  -- pendiente | pagada | cancelada
+  estado TEXT NOT NULL DEFAULT 'pendiente',  -- pendiente | pagada | cancelada | conflicto (pagó sin horario)
   mp_preference_id TEXT,
   creada_en TEXT NOT NULL DEFAULT (datetime('now')),
   pagada_en TEXT

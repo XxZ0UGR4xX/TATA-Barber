@@ -310,6 +310,9 @@ th { color: var(--muted); font-weight: 500; font-size: .8rem; text-transform: up
 .badge { font-size: .75rem; padding: 2px 8px; border-radius: 99px; }
 .badge.pagada { background: #13261a; color: var(--ok); }
 .badge.cancelada { background: #2a1513; color: var(--bad); }
+.badge.conflicto { background: var(--gold-soft); color: var(--gold-light); border: 1px solid var(--gold-line); }
+button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.stat.alerta { border-color: var(--gold); background: var(--gold-soft); }
 .bar { height: 8px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--gold-grad); }
 .login-box { max-width: 380px; margin: 60px auto; }
