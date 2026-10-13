@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aviso de privacidad · {{nombre}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
+</head>
+<body>
+<!-- Modelo de aviso de privacidad integral. Conviene que lo revise un abogado antes de publicarlo
+     y que se actualice la fecha al final si cambia lo que hace el sistema con los datos. -->
+<header class="top"><div class="wrap">
+  <a class="brand" href="index.html" style="color:inherit;text-decoration:none">{{{marcaHtml}}}</a>
+  <a class="btn ghost sm" href="index.html">Volver al sitio</a>
+</div></header>
+
+<main class="wrap legal">
+  <div class="eyebrow">{{nombre}}</div>
+  <h1>Aviso de privacidad</h1>
+
+  <h2>Quién es responsable de tus datos</h2>
+  <p><b>{{nombre}}</b>, con domicilio en {{direccion}}, {{ciudadEstado}}, es responsable del uso y protección de
+    los datos personales que nos das al reservar una cita en este sitio.</p>
+
+  <h2>Qué datos recabamos</h2>
+  <ul>
+    <li>Nombre, correo electrónico y teléfono.</li>
+    <li>Los datos de tu cita: servicio, barbero, día y hora.</li>
+  </ul>
+  <p>No te pedimos datos sensibles. <b>El pago lo procesa Mercado Pago</b>: nosotros no recibimos ni guardamos los
+    datos de tu tarjeta o cuenta bancaria; solo sabemos si el pago se aprobó.</p>
+
+  <h2>Para qué los usamos</h2>
+  <ul>
+    <li>Agendar, confirmar y administrar tu cita.</li>
+    <li>Enviarte por correo la confirmación y un recordatorio antes de tu cita.</li>
+    <li>Contactarte sobre tu cita: cambios de horario, reagendar o devolver un pago.</li>
+  </ul>
+  <p>No usamos tus datos para publicidad y no los vendemos.</p>
+
+  <h2>Con quién los compartimos</h2>
+  <p>Solo con los proveedores que necesitamos para darte el servicio y únicamente para las finalidades de arriba:
+    Mercado Pago (para procesar tu pago) y los servicios de alojamiento del sitio y de envío de correo.
+    No los compartimos con nadie más, salvo que una autoridad competente lo requiera conforme a la ley.</p>
+
+  <h2>Cuánto tiempo los guardamos</h2>
+  <p>Mientras sean necesarios para atender tu cita y cumplir con nuestras obligaciones legales y contables.</p>
+
+  <h2>Tus derechos</h2>
+  <p>Puedes pedirnos en cualquier momento <b>acceder</b> a tus datos, <b>corregirlos</b>, <b>cancelarlos</b> u
+    <b>oponerte</b> a su uso (derechos ARCO), así como revocar tu consentimiento. Para hacerlo, contáctanos por
+    cualquiera de estos medios e indica tu nombre, el código de tu cita (si lo tienes) y lo que solicitas:</p>
+  <ul>
+    {{#correo}}<li>Correo: <a href="mailto:{{correo}}">{{correo}}</a></li>{{/correo}}
+    {{#telLink}}<li>Teléfono: <a href="tel:{{telLink}}">{{telefono}}</a></li>{{/telLink}}
+    <li>En persona: {{direccion}}, {{ciudadEstado}}</li>
+  </ul>
+  <p>Te responderemos dentro de los plazos que marca la Ley Federal de Protección de Datos Personales en Posesión
+    de los Particulares.</p>
+
+  <h2>Cookies</h2>
+  <p>Este sitio no usa cookies de rastreo ni de publicidad. Solo el panel de administración usa una cookie de
+    sesión. Las tipografías se cargan desde Google Fonts.</p>
+
+  <h2>Cambios a este aviso</h2>
+  <p>Cualquier cambio lo publicaremos en esta misma página.</p>
+  <p class="muted">Última actualización: octubre de 2026.</p>
+</main>
+
+<footer class="legal-pie"><div class="wrap">© {{anio}} {{nombre}} · {{ciudad}}, México</div></footer>
+</body>
+</html>

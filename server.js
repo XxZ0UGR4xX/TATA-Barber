@@ -113,15 +113,18 @@ app.use(express.static(PUBLIC, { index: false }));
 const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 const toHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
-function ahoraMX() {
+// Fecha y minuto del día en hora de México para un instante dado
+function partesMX(fecha = new Date()) {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hour12: false,
-    }).formatToParts(new Date()).map((x) => [x.type, x.value])
+    }).formatToParts(fecha).map((x) => [x.type, x.value])
   );
   return { fecha: `${p.year}-${p.month}-${p.day}`, min: (Number(p.hour) % 24) * 60 + Number(p.minute) };
 }
+const ahoraMX = () => partesMX();
+const fechaHoraMX = (d) => { const p = partesMX(d); return `${p.fecha} ${toHHMM(p.min)}`; }; // 'YYYY-MM-DD HH:MM'
 
 function diaSemana(fecha) {
   const [y, m, d] = fecha.split('-').map(Number);
@@ -516,6 +519,27 @@ app.post('/api/admin/citas/:id/cancelar', requireAdmin, (req, res) => {
   const r = db.prepare("UPDATE citas SET estado='cancelada' WHERE id = ? AND estado != 'cancelada'").run(Number(req.params.id));
   res.json({ ok: r.changes === 1 });
 });
+
+// ---------- recordatorios: correo al cliente un día antes de su cita ----------
+// Cada 10 min busca citas pagadas que empiezan en las próximas 24 h y aún no tienen recordatorio.
+// No avisa si la cita se pagó hace menos de 3 h (el cliente acaba de recibir su confirmación).
+async function enviarRecordatorios() {
+  if (!mail.configurado()) return;
+  const desde = fechaHoraMX(new Date()), hasta = fechaHoraMX(new Date(Date.now() + 24 * 3600 * 1000));
+  const pendientes = db.prepare(`SELECT id FROM citas
+    WHERE estado = 'pagada' AND recordatorio_en IS NULL
+      AND (fecha || ' ' || hora) > ? AND (fecha || ' ' || hora) <= ?
+      AND pagada_en <= datetime('now', '-3 hours')`).all(desde, hasta);
+  for (const { id } of pendientes) {
+    // Se marca antes de enviar: un correo que falla no se reintenta cada 10 minutos
+    db.prepare("UPDATE citas SET recordatorio_en = datetime('now') WHERE id = ?").run(id);
+    const cita = citaCompleta('c.id = ?', id);
+    await mail.recordatorioCliente(cita, negocio()).catch((e) => console.error('[recordatorio]', cita.codigo, e.message));
+  }
+}
+const revisarRecordatorios = () => enviarRecordatorios().catch((e) => console.error('[recordatorios]', e.message));
+setTimeout(revisarRecordatorios, 30 * 1000);
+setInterval(revisarRecordatorios, 10 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);

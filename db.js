@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS horario (
 );
 `);
 
+// Columnas agregadas después de la primera versión (las bases ya creadas se actualizan solas)
+const columnas = db.prepare('PRAGMA table_info(citas)').all().map((c) => c.name);
+if (!columnas.includes('recordatorio_en')) db.exec('ALTER TABLE citas ADD COLUMN recordatorio_en TEXT');
+
 // Datos iniciales (solo si las tablas están vacías). Después se editan desde el panel de administrador.
 if (db.prepare('SELECT COUNT(*) AS n FROM horario').get().n === 0) {
   const ins = db.prepare('INSERT INTO horario (dia, abre, cierra) VALUES (?, ?, ?)');

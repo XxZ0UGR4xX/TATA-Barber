@@ -298,6 +298,16 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
   .footer-grid { grid-template-columns: 1fr; gap: 36px; }
 }
 
+/* ---------- aviso de privacidad ---------- */
+.nota-legal { font-size: .82rem; margin: 12px 0 0; }
+.legal { max-width: 760px; padding-top: 40px; padding-bottom: 40px; }
+.legal h1 { font-size: clamp(2rem, 6vw, 2.8rem); text-transform: uppercase; color: #fff; margin: 8px 0 24px; }
+.legal h2 { font-size: 1.1rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gold); margin: 28px 0 8px; }
+.legal p, .legal li { color: #d6d2ca; }
+.legal ul { padding-left: 20px; }
+.legal li { margin: 4px 0; }
+.legal-pie { border-top: 1px solid var(--line); padding: 22px 0; color: var(--muted); font-size: .75rem; letter-spacing: .2em; text-transform: uppercase; }
+
 /* ---------- admin ---------- */
 .stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 18px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); border-radius: var(--radius); padding: 16px; }

@@ -65,9 +65,16 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 - **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
 - **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
 
+- **Aviso de privacidad:** `public/privacidad.html` toma el nombre, dirección y contacto de la configuración. Es un modelo: conviene que lo revise un abogado antes de publicar.
+
+### Recordatorios
+Si el correo (SMTP) está configurado, el sistema manda solo un **recordatorio al cliente un día antes** de su cita (revisa cada 10 minutos). No se lo manda a citas pagadas hace menos de 3 horas, porque el cliente acaba de recibir su confirmación.
+
 ## 5. ¿Cómo se evita la doble reserva?
 
 Al pagar, el horario se **aparta** por 15 minutos mientras se completa el pago, y la verificación de disponibilidad + el apartado ocurren en una sola transacción de base de datos. Si dos personas intentan el mismo turno, solo una lo obtiene; la otra recibe aviso para elegir otro.
+
+Si un pago llega tarde (por ejemplo un OXXO, o una tarjeta después de los 15 minutos) y el horario ya lo tomó otra persona, la cita **no se encima**: queda como **"Por revisar"** en el panel y se avisa por correo a la barbería y al cliente para reagendar o devolver el pago.
 
 ## 6. Archivos
 
@@ -80,7 +87,8 @@ public/
   index.html     Reserva paso a paso (servicio → barbero → día/hora → datos → pago)
   pago-demo.html Pasarela simulada (solo en modo demo)
   gracias.html   Confirmación tras el pago
-  admin.html     Panel del administrador
+  admin.html     Panel del administrador (citas y configuración)
+  privacidad.html Aviso de privacidad
   productos.js   Productos de la tienda (ruleta)
   img/           Imagen del encabezado y fotos de productos
   styles.css     Estilos

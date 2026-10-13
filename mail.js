@@ -119,4 +119,21 @@ async function conflictoCliente(cita, n) {
   });
 }
 
-module.exports = { avisarBarberia, confirmarCliente, avisarConflicto, conflictoCliente };
+// Recordatorio al cliente un día antes de su cita
+async function recordatorioCliente(cita, n) {
+  const p = pie(n);
+  const lugar = n ? ` en ${n.nombre}` : '';
+  const aviso = n?.telefono ? `Si no puedes asistir, avísanos al ${n.telefono}.` : 'Si no puedes asistir, avísanos.';
+  await enviar({
+    to: cita.cliente_email,
+    subject: `Recordatorio: tu cita es el ${fechaLarga(cita.fecha)} a las ${cita.hora}`,
+    text: `Hola ${cita.cliente_nombre}, te recordamos tu cita${lugar}.\n\n` +
+      filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') + `\n\n${aviso}` + p.text,
+    html: `<h2 style="font-family:Arial,sans-serif">Hola ${esc(cita.cliente_nombre)}, te esperamos${esc(lugar)}</h2>${tablaHtml(cita)}
+           <p style="font-family:Arial,sans-serif;color:#666">${esc(aviso)} Llega 5 minutos antes.</p>${p.html}`,
+  });
+}
+
+const configurado = () => !!getTransporter();
+
+module.exports = { avisarBarberia, confirmarCliente, avisarConflicto, conflictoCliente, recordatorioCliente, configurado };
