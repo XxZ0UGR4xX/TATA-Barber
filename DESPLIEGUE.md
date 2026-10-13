@@ -65,10 +65,8 @@ las tarjetas que ahí te dan (por ejemplo, Mastercard de prueba, cualquier fecha
 CVC). Cuando todo funcione, cambia el token por el de producción (`APP_USR-…`).
 
 ## Personalizar barberos, servicios y horario
-- **Barberos y servicios** (nombres, precios, duración): se crean la primera vez en `db.js`.
-  Para cambiarlos, edita la lista inicial en `db.js`, borra la base (`barberia.db` en el
-  volumen) y vuelve a desplegar; o edítalos directo en la base de datos.
-- **Horario de atención**: edita el objeto `HORARIO` al inicio de `server.js`.
+- **Barberos, servicios, precios y horario**: entra al panel (`/admin.html`) → pestaña
+  **"Barberos, servicios y horario"**. Los cambios se ven en el sitio al instante, sin redesplegar.
 
 ## Alternativa: Railway (con Docker)
 El proyecto incluye `Dockerfile`. En https://railway.app → New Project → Deploy from repo.

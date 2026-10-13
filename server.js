@@ -16,17 +16,13 @@ const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const HOLD_MINUTES = 15; // tiempo que se aparta un horario mientras se paga
 
-// Horario de la barbería: 0 = domingo ... 6 = sábado. null = cerrado.
-const HORARIO = {
-  0: null,
-  1: ['10:00', '19:00'],
-  2: ['10:00', '19:00'],
-  3: ['10:00', '19:00'],
-  4: ['10:00', '19:00'],
-  5: ['10:00', '20:00'],
-  6: ['09:00', '18:00'],
-};
-const PASO = 30; // minutos entre horarios
+const PASO = 30; // minutos entre horarios (las duraciones de los servicios son múltiplos de esto)
+
+// Horario de la barbería (se edita en el panel): { 0: null | ['10:00','19:00'], ... } con 0 = domingo
+function horario() {
+  return Object.fromEntries(db.prepare('SELECT dia, abre, cierra FROM horario ORDER BY dia').all()
+    .map((h) => [h.dia, h.abre && h.cierra ? [h.abre, h.cierra] : null]));
+}
 
 // ---------- Mercado Pago ----------
 const MP_TOKEN = process.env.MP_ACCESS_TOKEN || '';
@@ -78,12 +74,12 @@ const SQL_OCUPADAS = `
     AND (estado = 'pagada' OR (estado = 'pendiente' AND creada_en > datetime('now', ?)))`;
 
 function slotsDelDia(barberoId, fecha, duracion) {
-  const horario = HORARIO[diaSemana(fecha)];
-  if (!horario) return [];
+  const delDia = horario()[diaSemana(fecha)];
+  if (!delDia) return [];
   const ocupadas = db.prepare(SQL_OCUPADAS).all(barberoId, fecha, `-${HOLD_MINUTES} minutes`)
     .map((c) => [toMin(c.hora), toMin(c.hora) + c.duracion]);
   const ahora = ahoraMX();
-  const [ini, fin] = horario.map(toMin);
+  const [ini, fin] = delDia.map(toMin);
   const slots = [];
   for (let t = ini; t + duracion <= fin; t += PASO) {
     const choca = ocupadas.some(([a, b]) => t < b && t + duracion > a);
@@ -169,11 +165,12 @@ app.post('/api/mp/webhook', async (req, res) => {
 
 // ---------- API pública ----------
 app.get('/api/config', (req, res) => {
+  const h = horario();
   res.json({
     barberos: db.prepare('SELECT id, nombre, especialidad FROM barberos WHERE activo = 1').all(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
-    diasCerrados: Object.keys(HORARIO).filter((d) => !HORARIO[d]).map(Number),
-    horario: HORARIO,
+    diasCerrados: Object.keys(h).filter((d) => !h[d]).map(Number),
+    horario: h,
     demo: MODO_DEMO,
     hoy: ahoraMX().fecha,
   });
@@ -366,8 +363,65 @@ app.get('/api/admin/resumen', requireAdmin, (req, res) => {
   const porBarbero = db.prepare(`
     SELECT b.nombre AS barbero, COUNT(c.id) AS citas, COALESCE(SUM(c.precio),0) AS ingresos
     FROM barberos b LEFT JOIN citas c ON c.barbero_id = b.id AND c.estado = 'pagada'
-    GROUP BY b.id ORDER BY citas DESC`).all();
+    GROUP BY b.id HAVING b.activo = 1 OR COUNT(c.id) > 0 ORDER BY citas DESC`).all();
   res.json({ ...tot, porBarbero, fecha: hoy }); // `hoy` es el número de citas de hoy
+});
+
+// ---------- admin: barberos, servicios y horario ----------
+const texto = (v, max) => String(v ?? '').trim().slice(0, max);
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function leerBarbero(b = {}) {
+  const nombre = texto(b.nombre, 40), especialidad = texto(b.especialidad, 60);
+  if (nombre.length < 2) return { error: 'Escribe el nombre del barbero' };
+  return { valores: [nombre, especialidad, b.activo === false ? 0 : 1] };
+}
+function leerServicio(s = {}) {
+  const nombre = texto(s.nombre, 50), descripcion = texto(s.descripcion, 100);
+  const precio = Number(s.precio), duracion = Number(s.duracion);
+  if (nombre.length < 2) return { error: 'Escribe el nombre del servicio' };
+  if (!Number.isInteger(precio) || precio < 1 || precio > 100000) return { error: 'El precio debe ser un número entero de pesos' };
+  if (!Number.isInteger(duracion) || duracion < PASO || duracion > 240 || duracion % PASO) {
+    return { error: `La duración debe ser de ${PASO} en ${PASO} minutos (máximo 240)` };
+  }
+  return { valores: [nombre, descripcion, precio, duracion, s.activo === false ? 0 : 1] };
+}
+const responder = (res, r, ejecutar) => (r.error ? res.status(400).json({ error: r.error }) : res.json(ejecutar(r.valores)));
+
+app.get('/api/admin/catalogo', requireAdmin, (req, res) => {
+  res.json({
+    barberos: db.prepare('SELECT id, nombre, especialidad, activo FROM barberos ORDER BY id').all(),
+    servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion, activo FROM servicios ORDER BY id').all(),
+    horario: horario(),
+    paso: PASO,
+  });
+});
+
+app.post('/api/admin/barberos', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
+  ({ id: Number(db.prepare('INSERT INTO barberos (nombre, especialidad, activo) VALUES (?,?,?)').run(...v).lastInsertRowid) })));
+app.put('/api/admin/barberos/:id', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
+  ({ ok: db.prepare('UPDATE barberos SET nombre = ?, especialidad = ?, activo = ? WHERE id = ?').run(...v, Number(req.params.id)).changes === 1 })));
+
+app.post('/api/admin/servicios', requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
+  ({ id: Number(db.prepare('INSERT INTO servicios (nombre, descripcion, precio, duracion, activo) VALUES (?,?,?,?,?)').run(...v).lastInsertRowid) })));
+app.put('/api/admin/servicios/:id', requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
+  ({ ok: db.prepare('UPDATE servicios SET nombre = ?, descripcion = ?, precio = ?, duracion = ?, activo = ? WHERE id = ?').run(...v, Number(req.params.id)).changes === 1 })));
+
+// Cuerpo: { dias: { "0": null, "1": ["10:00","19:00"], ... } }
+app.put('/api/admin/horario', requireAdmin, (req, res) => {
+  const dias = req.body?.dias || {};
+  const filas = [];
+  for (let d = 0; d <= 6; d++) {
+    const v = dias[d];
+    if (v === null || v === undefined) { filas.push([null, null, d]); continue; }
+    if (!Array.isArray(v) || !HHMM.test(v[0]) || !HHMM.test(v[1]) || toMin(v[0]) >= toMin(v[1])) {
+      return res.status(400).json({ error: 'Revisa el horario: la apertura debe ser antes del cierre' });
+    }
+    filas.push([v[0], v[1], d]);
+  }
+  const upd = db.prepare('UPDATE horario SET abre = ?, cierra = ? WHERE dia = ?');
+  db.transaction(() => filas.forEach((f) => upd.run(...f)))();
+  res.json({ ok: true, horario: horario() });
 });
 
 app.post('/api/admin/citas/:id/cancelar', requireAdmin, (req, res) => {

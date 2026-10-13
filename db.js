@@ -42,9 +42,21 @@ CREATE TABLE IF NOT EXISTS citas (
 
 CREATE INDEX IF NOT EXISTS idx_citas_barbero_fecha ON citas (barbero_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_citas_estado ON citas (estado);
+
+-- Horario de atención: 0 = domingo ... 6 = sábado. abre/cierra en NULL = cerrado ese día.
+CREATE TABLE IF NOT EXISTS horario (
+  dia INTEGER PRIMARY KEY CHECK (dia BETWEEN 0 AND 6),
+  abre TEXT,
+  cierra TEXT
+);
 `);
 
-// Datos iniciales (solo si las tablas están vacías). Edítalos a tu gusto.
+// Datos iniciales (solo si las tablas están vacías). Después se editan desde el panel de administrador.
+if (db.prepare('SELECT COUNT(*) AS n FROM horario').get().n === 0) {
+  const ins = db.prepare('INSERT INTO horario (dia, abre, cierra) VALUES (?, ?, ?)');
+  [[0, null, null], [1, '10:00', '19:00'], [2, '10:00', '19:00'], [3, '10:00', '19:00'],
+   [4, '10:00', '19:00'], [5, '10:00', '20:00'], [6, '09:00', '18:00']].forEach((d) => ins.run(...d));
+}
 if (db.prepare('SELECT COUNT(*) AS n FROM barberos').get().n === 0) {
   const ins = db.prepare('INSERT INTO barberos (nombre, especialidad) VALUES (?, ?)');
   ins.run('Carlos', 'Fade y degradados');

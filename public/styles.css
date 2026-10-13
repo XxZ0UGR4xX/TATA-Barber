@@ -316,3 +316,37 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 .bar { height: 8px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--gold-grad); }
 .login-box { max-width: 380px; margin: 60px auto; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 12px 0 18px; }
+.panel-head h1 { margin: 0; text-transform: uppercase; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab {
+  padding: 8px 16px; border-radius: 99px; border: 1px solid var(--line); background: transparent;
+  color: var(--muted); font: inherit; font-size: .85rem; cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab.on { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.filas { display: grid; gap: 10px; margin: 14px 0; }
+.fila {
+  display: grid; gap: 10px; align-items: end; padding: 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
+}
+.fila.barbero { grid-template-columns: 1fr 1.4fr auto auto; }
+.fila.servicio { grid-template-columns: 1.1fr 1.7fr 100px 110px auto auto; }
+.fila.nueva { border-style: dashed; border-color: var(--gold-line); }
+.fila.oculto > div { opacity: .55; }
+.fila input, .fila select { background: var(--panel); }
+.check { display: flex; align-items: center; gap: 8px; margin: 0; padding-bottom: 11px; color: var(--text); font-size: .88rem; white-space: nowrap; cursor: pointer; }
+.check input { width: 18px; height: 18px; padding: 0; accent-color: var(--gold); }
+.fila .btn.sm { padding: 11px 16px; }
+.dias { display: grid; gap: 8px; margin: 14px 0 18px; max-width: 520px; }
+.dia-fila { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.dia-fila input[type="time"] { min-width: 0; padding-left: 10px; padding-right: 8px; }
+.dia-fila .check { padding-bottom: 0; }
+.dia-fila input[type="time"]:disabled { opacity: .35; }
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 20; width: min(92vw, 420px); pointer-events: none; }
+.toast .msg { box-shadow: 0 10px 30px rgba(0, 0, 0, .5); text-align: center; }
+@media (max-width: 760px) {
+  .fila.barbero, .fila.servicio { grid-template-columns: 1fr 1fr; }
+  .fila .ancho { grid-column: 1 / -1; }
+  .dia-fila { grid-template-columns: 100px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+}

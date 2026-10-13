@@ -59,8 +59,8 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 
 ## 4. Personalizar barberos, servicios y horario
 
-- **Barberos y servicios:** se crean automáticamente la primera vez en `db.js`. Para cambiarlos después, edítalos directamente en la base de datos, o borra `barberia.db` y ajusta la lista inicial en `db.js` antes de volver a arrancar.
-- **Horario de atención:** edita el objeto `HORARIO` al inicio de `server.js` (día de la semana → `['apertura','cierre']`, o `null` si cierran). El `PASO` controla cada cuántos minutos hay un turno. El horario del pie de página se actualiza solo con este objeto.
+- **Barberos, servicios, precios y horario:** se editan desde el panel de administrador, en la pestaña **"Barberos, servicios y horario"**. Los cambios se ven en el sitio al instante. La lista inicial (la primera vez que arranca) está en `db.js`. Un barbero o servicio no se borra: se marca como no visible, para conservar sus citas pasadas.
+- El `PASO` al inicio de `server.js` controla cada cuántos minutos hay un turno (30). El horario del pie de página se actualiza solo.
 - **Pie de página (dirección, teléfono, redes, correo):** edita el bloque marcado con ✏️ al final de `public/index.html`.
 - **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
 - **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
