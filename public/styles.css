@@ -22,10 +22,10 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: var(--bg); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body {
-  background: var(--bg);
+  background: transparent; /* el fondo va en <html> para que se vea la imagen fija de .fondo-fijo */
   color: var(--text);
   font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   line-height: 1.5;
@@ -56,6 +56,17 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
 }
 .top-nav > a:not(.btn):hover { color: var(--gold); }
 
+/* Al bajar, la imagen del encabezado se queda fija detrás del contenido, medio transparente */
+.fondo-fijo {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0;
+  background: var(--fondo) center / cover no-repeat;
+}
+.fondo-fijo::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(11, 11, 11, .35) 0%, rgba(11, 11, 11, .6) 60%, rgba(11, 11, 11, .8) 100%);
+}
+@media (max-width: 760px) { .fondo-fijo { background-image: var(--fondo-movil); } }
+
 /* Imagen del encabezado: ancho completo, se funde con el fondo */
 .banner { position: relative; background: #000; line-height: 0; }
 .banner img { display: block; width: 100%; height: auto; max-height: 640px; object-fit: cover; }
@@ -77,8 +88,8 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
 .steps span.on { border-color: var(--accent); color: var(--accent); background: var(--gold-soft); }
 
 .card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 20px; margin-bottom: 18px;
+  background: rgba(20, 20, 20, .84); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px; margin-bottom: 18px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 .card h2 { font-size: 1.15rem; text-transform: uppercase; letter-spacing: .06em; }
 .card h2 small { color: var(--muted); font-family: Inter, sans-serif; text-transform: none; font-weight: 400; font-size: .85rem; letter-spacing: 0; }
@@ -88,12 +99,13 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
   padding: 14px; cursor: pointer; text-align: left; color: var(--text); font: inherit;
   transition: border-color .15s, transform .15s;
+  display: flex; flex-direction: column; align-items: flex-start; /* texto arriba y precio al fondo */
 }
 .opt:hover { border-color: var(--gold-line); }
 .opt.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: var(--gold-soft); }
 .opt .t { font-weight: 600; }
 .opt .s { color: var(--muted); font-size: .88rem; }
-.opt .p { color: var(--accent); font-weight: 700; margin-top: 6px; }
+.opt .p { color: var(--accent); font-weight: 700; margin-top: auto; padding-top: 6px; }
 .avatar {
   width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   background: var(--gold-grad); color: var(--accent-ink); font-weight: 700; margin-bottom: 8px;
@@ -155,6 +167,20 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .muted { color: var(--muted); }
 .hidden { display: none !important; }
 
+/* ---------- referencias: videos de trabajos ---------- */
+.referencias { padding-top: 48px; }
+.ref-track {
+  display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px;
+  scrollbar-width: thin; scrollbar-color: var(--gold-line) transparent;
+}
+.ref { flex: 0 0 240px; margin: 0; scroll-snap-align: start; }
+.ref video {
+  display: block; width: 100%; aspect-ratio: 9 / 16; object-fit: cover; background: #000;
+  border-radius: var(--radius); border: 1px solid var(--line);
+}
+.ref figcaption { margin-top: 8px; font-size: .88rem; color: var(--muted); }
+@media (max-width: 640px) { .ref { flex-basis: 72vw; } }
+
 /* ---------- tienda: ruleta de productos ---------- */
 .tienda { padding-top: 48px; }
 .tienda-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
@@ -175,7 +201,8 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .ruleta-track::-webkit-scrollbar { display: none; }
 .producto {
   flex: 0 0 100%; scroll-snap-align: start; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  background: rgba(20, 20, 20, .88); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 .p-media { position: relative; background: #000; aspect-ratio: 4 / 5; }
 .p-media .p-img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -341,7 +368,7 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   display: grid; gap: 10px; align-items: end; padding: 12px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
 }
-.fila.barbero { grid-template-columns: 1fr 1.4fr auto auto; }
+.fila.barbero { grid-template-columns: 1fr auto auto; }
 .fila.servicio { grid-template-columns: 1.1fr 1.7fr 100px 110px auto auto; }
 .fila.nueva { border-style: dashed; border-color: var(--gold-line); }
 .fila.oculto > div { opacity: .55; }

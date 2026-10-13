@@ -234,10 +234,9 @@ function aviso(texto, tipo = 'ok') {
 const casilla = (activo) => `<label class="check"><input type="checkbox" name="activo" ${activo ? 'checked' : ''} /> Visible</label>`;
 const claseFila = (tipo, x) => `fila ${tipo}${x.id ? '' : ' nueva'}${x.activo ? '' : ' oculto'}`;
 
-function filaBarbero(b = { id: '', nombre: '', especialidad: '', activo: 1 }) {
+function filaBarbero(b = { id: '', nombre: '', activo: 1 }) {
   return `<div class="${claseFila('barbero', b)}" data-tipo="barberos" data-id="${b.id}">
     <div class="ancho"><label>Nombre</label><input name="nombre" maxlength="40" value="${esc(b.nombre)}" /></div>
-    <div class="ancho"><label>Especialidad</label><input name="especialidad" maxlength="60" value="${esc(b.especialidad)}" /></div>
     ${casilla(b.activo)}
     <button class="btn sm" data-guardar>${b.id ? 'Guardar' : 'Agregar'}</button>
   </div>`;

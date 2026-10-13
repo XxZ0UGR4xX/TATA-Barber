@@ -68,17 +68,24 @@ if (db.prepare('SELECT COUNT(*) AS n FROM horario').get().n === 0) {
    [4, '10:00', '19:00'], [5, '10:00', '20:00'], [6, '09:00', '18:00']].forEach((d) => ins.run(...d));
 }
 if (db.prepare('SELECT COUNT(*) AS n FROM barberos').get().n === 0) {
-  const ins = db.prepare('INSERT INTO barberos (nombre, especialidad) VALUES (?, ?)');
-  ins.run('Carlos', 'Fade y degradados');
-  ins.run('Miguel', 'Barba y navaja');
-  ins.run('Andrés', 'Corte clásico');
+  const ins = db.prepare('INSERT INTO barberos (nombre) VALUES (?)');
+  ['Carlos', 'Miguel', 'Andrés'].forEach((n) => ins.run(n));
 }
 if (db.prepare('SELECT COUNT(*) AS n FROM servicios').get().n === 0) {
   const ins = db.prepare('INSERT INTO servicios (nombre, descripcion, precio, duracion) VALUES (?, ?, ?, ?)');
-  ins.run('Corte de cabello', 'Corte a tu estilo con acabado a navaja', 150, 30);
-  ins.run('Barba', 'Perfilado, toalla caliente y aceites', 100, 30);
-  ins.run('Corte + Barba', 'El paquete completo', 220, 60);
-  ins.run('Corte infantil', 'Para niños de hasta 12 años', 120, 30);
+  // Lista de precios de la barbería (precio en pesos, duración en minutos)
+  [
+    ['Corte de cabello', 'Corte a tu estilo con acabado a navaja', 180, 30],
+    ['Corte con mascarilla', 'Corte de cabello más mascarilla facial', 210, 60],
+    ['Corte con facial', 'Corte de cabello más limpieza facial', 280, 60],
+    ['Corte de niño', 'Corte de cabello para niños', 150, 30],
+    ['Corte y barba', 'Corte de cabello y arreglo de barba', 230, 60],
+    ['Corte y barba con vapor y toalla caliente', 'Corte y barba con ritual de vapor y toalla caliente', 280, 60],
+    ['Corte, barba, vapor, toalla caliente y facial', 'El paquete completo', 330, 90],
+    ['Corte de ceja', 'Perfilado de ceja', 30, 30],
+    ['Delineado', 'Delineado del contorno del corte', 110, 30],
+    ['Delineado de barba', 'Perfilado de la línea de la barba', 110, 30],
+  ].forEach((s) => ins.run(...s));
 }
 
 module.exports = db;

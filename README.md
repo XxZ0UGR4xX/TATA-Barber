@@ -63,6 +63,7 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 - El `PASO` al inicio de `server.js` controla cada cuántos minutos hay un turno (30). El horario del pie de página se actualiza solo.
 - **Datos de la barbería (nombre, dirección, teléfono, WhatsApp, correo, redes):** el dueño los cambia en el panel → **"Configuración"** → "Datos de la barbería". Los valores de instalación, los **colores** y la **imagen del encabezado** están en `negocio.js`. Para instalar el sistema a otra barbería, cambia `negocio.js` y las imágenes de `public/img/`; no hace falta tocar el HTML.
 - **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
+- **Referencias (videos de trabajos):** pon los MP4 en `public/videos/` y agrégalos a la lista de `public/referencias.js`. Mientras la lista esté vacía, la sección no aparece.
 - **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
 
 - **Aviso de privacidad:** `public/privacidad.html` toma el nombre, dirección y contacto de la configuración. Es un modelo: conviene que lo revise un abogado antes de publicar.

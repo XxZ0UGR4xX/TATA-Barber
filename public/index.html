@@ -10,9 +10,11 @@
 <style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
 </head>
 <body>
+<div class="fondo-fijo" aria-hidden="true" style="--fondo: url('{{banner}}'); --fondo-movil: url('{{bannerMovil}}')"></div>
 <header class="top"><div class="wrap">
   <div class="brand">{{{marcaHtml}}}</div>
   <nav class="top-nav">
+    <a href="#referencias" class="solo-referencias">Referencias</a>
     <a href="#tienda">Tienda</a>
     <a class="btn ghost sm" href="admin.html">Administrador</a>
   </nav>
@@ -77,6 +79,19 @@
     <p class="muted" id="pago-nota" style="margin-top:10px"></p>
   </section>
 </main>
+
+<section class="referencias hidden" id="referencias">
+  <div class="wrap">
+    <div class="tienda-head">
+      <div>
+        <div class="eyebrow">Referencias</div>
+        <h2>Nuestro trabajo</h2>
+        <p class="muted">Cortes, barbas y detalles hechos aquí. Desliza para ver más.</p>
+      </div>
+    </div>
+    <div class="ref-track" id="ref-track"></div>
+  </div>
+</section>
 
 <section class="tienda" id="tienda">
   <div class="wrap">
@@ -168,6 +183,7 @@
       <ul class="f-list">
         <li><a href="#top">Inicio</a></li>
         <li><a href="#box-servicio">Reservar cita</a></li>
+        <li class="solo-referencias"><a href="#referencias">Referencias</a></li>
         <li><a href="#tienda">Tienda</a></li>
         <li><a href="{{mapa}}" target="_blank" rel="noopener">Cómo llegar</a></li>
         <li><a href="privacidad.html">Aviso de privacidad</a></li>
@@ -185,6 +201,7 @@
 </footer>
 
 <script src="productos.js"></script>
+<script src="referencias.js"></script>
 <script>
 const NEGOCIO = {{{negocioJson}}}; // datos del negocio (los llena el servidor)
 const $ = (s) => document.querySelector(s);
@@ -213,7 +230,6 @@ async function init() {
     <button class="opt" data-id="${b.id}">
       <div class="avatar">${b.nombre[0]}</div>
       <div class="t">${b.nombre}</div>
-      <div class="s">${b.especialidad || ''}</div>
     </button>`).join('');
   construirDias();
   pintarHorario(st.config.horario);
@@ -412,6 +428,39 @@ function initRuleta() {
   setInterval(() => { if (!pausa && !document.hidden) ir(actual + 1); }, 6000);
 }
 
+// ---------- Referencias: videos de trabajos (los datos están en referencias.js) ----------
+function initReferencias() {
+  const lista = typeof REFERENCIAS !== 'undefined' ? REFERENCIAS : [];
+  if (!lista.length) { document.querySelectorAll('.solo-referencias').forEach((e) => e.remove()); return; }
+  $('#ref-track').innerHTML = lista.map((r) => `
+    <figure class="ref">
+      <video src="${esc(r.video)}" ${r.poster ? `poster="${esc(r.poster)}"` : ''} controls playsinline preload="${r.poster ? 'none' : 'metadata'}"></video>
+      ${r.titulo ? `<figcaption>${esc(r.titulo)}</figcaption>` : ''}
+    </figure>`).join('');
+  // Solo un video suena a la vez
+  $('#ref-track').addEventListener('play', (e) => {
+    document.querySelectorAll('#ref-track video').forEach((v) => { if (v !== e.target) v.pause(); });
+  }, true);
+  $('#referencias').classList.remove('hidden');
+}
+
+// Fondo: la imagen del encabezado aparece fija y medio transparente conforme se baja
+(() => {
+  const fondo = $('.fondo-fijo'), banner = $('.banner');
+  if (!fondo || !banner) return;
+  const OPACIDAD = 0.55; // ya con el degradado oscuro encima
+  let pendiente = false;
+  const actualizar = () => {
+    pendiente = false;
+    const avance = Math.min(1, window.scrollY / Math.max(1, banner.offsetHeight));
+    fondo.style.opacity = (OPACIDAD * avance).toFixed(3);
+  };
+  addEventListener('scroll', () => { if (!pendiente) { pendiente = true; requestAnimationFrame(actualizar); } }, { passive: true });
+  addEventListener('resize', actualizar);
+  actualizar();
+})();
+
+initReferencias();
 initRuleta();
 init().catch(() => msg('No se pudo cargar la información. Recarga la página.'));
 </script>
