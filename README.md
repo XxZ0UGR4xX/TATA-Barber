@@ -37,7 +37,7 @@ npm start
 
 | Variable | Para qué sirve |
 |---|---|
-| `BASE_URL` | URL pública de tu sitio (usa `https://...` en producción). |
+| `BASE_URL` | URL pública de tu sitio (usa `https://...` en producción). En Render no hace falta salvo con dominio propio. |
 | `ADMIN_USER` / `ADMIN_PASS` | Acceso al panel de administrador. **Cambia la contraseña.** |
 | `SESSION_SECRET` | Texto largo y aleatorio para firmar la sesión del admin. |
 | `BARBERIA_EMAIL` | Correo que **recibe** el aviso de cada cita. |

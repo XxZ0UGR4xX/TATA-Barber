@@ -7,7 +7,9 @@ const db = require('./db');
 const mail = require('./mail');
 
 const PORT = process.env.PORT || 3000;
-const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+// En Render, RENDER_EXTERNAL_URL trae la URL pública (https://...onrender.com). BASE_URL solo hace falta
+// para un dominio propio o fuera de Render.
+const BASE_URL = (process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
 const TZ = 'America/Mexico_City';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';

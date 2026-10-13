@@ -19,12 +19,8 @@ services:
         value: "22"
       - key: DB_PATH
         value: /data/barberia.db
-      # BASE_URL se autollenará con la URL pública de Render
-      - key: BASE_URL
-        fromService:
-          type: web
-          name: tata-barber
-          property: hostport
+      # BASE_URL no hace falta: el servidor usa la URL pública que Render le da (RENDER_EXTERNAL_URL).
+      # Si conectas un dominio propio, agrega BASE_URL=https://tu-dominio en el panel de Render.
       # El resto se llena a mano en el panel (por seguridad no van en el repo):
       - key: ADMIN_USER
         sync: false

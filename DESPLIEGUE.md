@@ -40,7 +40,7 @@ Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
    - `SMTP_PASS` → la contraseña de aplicación del Paso 3
    - `MAIL_FROM` → `Tata Barber <el-gmail@gmail.com>`
    - `MP_ACCESS_TOKEN` → tu Access Token de Mercado Pago
-   - (`SESSION_SECRET` y `BASE_URL` se generan/llenan solos)
+   - (`SESSION_SECRET` se genera solo. `BASE_URL` no hace falta: el sistema usa la URL pública de Render)
 5. Dale **Deploy**. En unos minutos tendrás una URL tipo `https://tata-barber.onrender.com`.
 
 ## Paso 5 — Conecta el webhook de Mercado Pago (importante)
@@ -53,7 +53,8 @@ Esto confirma el pago aunque el cliente cierre el navegador.
 ## Paso 6 — (Opcional) Dominio propio
 1. Compra `tatabarber.com` (Namecheap, Cloudflare, GoDaddy).
 2. En Render → **Settings → Custom Domain**, agrégalo y sigue las instrucciones de DNS.
-3. Actualiza `BASE_URL` a `https://tatabarber.com`.
+3. En Render → **Environment**, agrega la variable `BASE_URL` con `https://tatabarber.com` y guarda (se redespliega solo).
+4. En Mercado Pago, cambia la URL del webhook a `https://tatabarber.com/api/mp/webhook`.
 
 ---
 
