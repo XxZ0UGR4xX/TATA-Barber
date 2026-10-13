@@ -12,6 +12,7 @@ COPY . .
 
 # La base de datos vive aquí. Monta un volumen en /data para que persista.
 ENV DB_PATH=/data/barberia.db
+ENV NODE_ENV=production
 VOLUME ["/data"]
 
 EXPOSE 3000

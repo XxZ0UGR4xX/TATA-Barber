@@ -116,7 +116,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </main>
 
-<script>
+<script nonce="{{nonce}}">
 const $ = (s) => document.querySelector(s);
 const money = (n) => '$' + n + ' MXN';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

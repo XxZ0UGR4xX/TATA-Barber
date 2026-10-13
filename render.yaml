@@ -17,6 +17,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: production
       - key: DB_PATH
         value: /data/barberia.db
       # BASE_URL no hace falta: el servidor usa la URL pública que Render le da (RENDER_EXTERNAL_URL).

@@ -200,16 +200,17 @@
   </div>
 </footer>
 
-<script src="productos.js"></script>
-<script src="referencias.js"></script>
-<script>
+<script src="productos.js" nonce="{{nonce}}"></script>
+<script src="referencias.js" nonce="{{nonce}}"></script>
+<script nonce="{{nonce}}">
 const NEGOCIO = {{{negocioJson}}}; // datos del negocio (los llena el servidor)
 const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); // todo dato va escapado al HTML
 const money = (n) => '$' + n + ' MXN';
 const st = { servicio: null, barbero: null, fecha: null, hora: null, config: null };
 
 function msg(text, tipo = 'err') {
-  $('#msg').innerHTML = text ? `<div class="msg ${tipo}">${text}</div>` : '';
+  $('#msg').innerHTML = text ? `<div class="msg ${tipo === 'info' ? 'info' : 'err'}">${esc(text)}</div>` : '';
   if (text) $('#msg').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 function paso(n) {
@@ -220,16 +221,16 @@ async function init() {
   st.config = await (await fetch('/api/config')).json();
   // Servicios
   $('#servicios').innerHTML = st.config.servicios.map((s) => `
-    <button class="opt" data-id="${s.id}">
-      <div class="t">${s.nombre}</div>
-      <div class="s">${s.descripcion || ''} · ${s.duracion} min</div>
-      <div class="p">${money(s.precio)}</div>
+    <button class="opt" data-id="${Number(s.id)}">
+      <div class="t">${esc(s.nombre)}</div>
+      <div class="s">${esc(s.descripcion)} · ${Number(s.duracion)} min</div>
+      <div class="p">${money(Number(s.precio))}</div>
     </button>`).join('');
   // Barberos
   $('#barberos').innerHTML = st.config.barberos.map((b) => `
-    <button class="opt" data-id="${b.id}">
-      <div class="avatar">${b.nombre[0]}</div>
-      <div class="t">${b.nombre}</div>
+    <button class="opt" data-id="${Number(b.id)}">
+      <div class="avatar">${esc(b.nombre[0])}</div>
+      <div class="t">${esc(b.nombre)}</div>
     </button>`).join('');
   construirDias();
   pintarHorario(st.config.horario);
@@ -298,7 +299,7 @@ async function cargarSlots() {
   const libres = data.slots.filter((s) => s.disponible).length;
   $('#slots-hint').textContent = libres ? `${libres} horarios disponibles:` : 'Todo ocupado ese día. Prueba otro.';
   $('#slots').innerHTML = data.slots.map((s) =>
-    `<button class="slot" data-hora="${s.hora}" ${s.disponible ? '' : 'disabled'}>${s.hora}</button>`).join('');
+    `<button class="slot" data-hora="${esc(s.hora)}" ${s.disponible ? '' : 'disabled'}>${esc(s.hora)}</button>`).join('');
   $('#slots').onclick = (e) => {
     const b = e.target.closest('.slot'); if (!b || b.disabled) return;
     $('#slots').querySelectorAll('.slot').forEach((x) => x.classList.remove('sel'));
@@ -314,11 +315,11 @@ function actualizarResumen() {
   if (!(st.servicio && st.barbero && st.fecha && st.hora)) return;
   const f = new Date(st.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
   $('#resumen').innerHTML = `
-    <dt>Servicio</dt><dd>${st.servicio.nombre}</dd>
-    <dt>Barbero</dt><dd>${st.barbero.nombre}</dd>
-    <dt>Día</dt><dd style="text-transform:capitalize">${f}</dd>
-    <dt>Hora</dt><dd>${st.hora} (${st.servicio.duracion} min)</dd>
-    <dt>Total</dt><dd>${money(st.servicio.precio)}</dd>`;
+    <dt>Servicio</dt><dd>${esc(st.servicio.nombre)}</dd>
+    <dt>Barbero</dt><dd>${esc(st.barbero.nombre)}</dd>
+    <dt>Día</dt><dd style="text-transform:capitalize">${esc(f)}</dd>
+    <dt>Hora</dt><dd>${esc(st.hora)} (${Number(st.servicio.duracion)} min)</dd>
+    <dt>Total</dt><dd>${money(Number(st.servicio.precio))}</dd>`;
   show('#box-pago'); paso(5);
   $('#pago-nota').textContent = st.config.demo
     ? 'Modo demostración: el pago se simula (no se cobra nada real).'
@@ -346,7 +347,6 @@ $('#btn-pagar').onclick = async () => {
 };
 
 // ---------- Tienda: ruleta de productos (los datos están en productos.js) ----------
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ICONO_WA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z"/></svg>';
 const ICONO_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>';
 

@@ -97,7 +97,17 @@ public/
 .env.example     Plantilla de configuración
 ```
 
-## 7. Notas para producción
+## 7. Seguridad
+
+- **Base de datos:** todas las consultas usan parámetros (`?`); los datos del usuario nunca se pegan al SQL.
+- **Inyección de JavaScript (XSS):** todo lo que se muestra en las páginas, el panel y los correos va escapado, y la política de contenido (CSP con *nonce*) solo deja correr los scripts del propio sitio.
+- **Cabeceras:** CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y HSTS con HTTPS.
+- **Abuso de la agenda:** máximo 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; solo se reserva hasta 60 días adelante.
+- **Pagos:** cada pago se verifica con Mercado Pago (estado, monto y moneda); la página de confirmación solo muestra la cita si coincide el `preference_id`.
+- **Panel:** contraseña obligatoria en producción (mínimo 8 caracteres), 5 intentos de login cada 15 min por IP, cookie `httpOnly` + `SameSite=Strict`; cambiar `ADMIN_PASS` cierra todas las sesiones.
+- **Errores:** nunca muestran rutas ni detalles internos del servidor.
+
+## 8. Notas para producción
 
 - Sirve el sitio por **HTTPS** (así la cookie del admin viaja segura).
 - Cambia `ADMIN_PASS` y `SESSION_SECRET`.

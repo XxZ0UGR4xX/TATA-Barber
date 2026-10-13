@@ -111,8 +111,35 @@ function datosPagina() {
   return { ...n, negocioJson: json };
 }
 
+// Política de contenido: solo corren los scripts del propio sitio y los que llevan el nonce de esa respuesta,
+// así un script inyectado (p. ej. <img onerror=…>) no se ejecuta aunque llegara a colarse en la página.
+const politica = (nonce) => [
+  "default-src 'self'",
+  `script-src 'self' 'nonce-${nonce}'`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "media-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 const app = express();
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  });
+  if (BASE_URL.startsWith('https')) res.set('Strict-Transport-Security', 'max-age=15552000');
+  next();
+});
 app.use(express.json({ limit: '20kb' }));
 app.use(cookieParser());
 // Las páginas HTML se llenan con los datos del negocio; lo demás (CSS, imágenes, JS) se sirve tal cual
@@ -121,7 +148,9 @@ app.use((req, res, next) => {
   const archivo = req.path === '/' ? 'index.html' : req.path.slice(1);
   const pagina = PAGINAS.get(archivo);
   if (!pagina) return next();
-  res.type('html').set('Cache-Control', 'no-cache').send(plantilla(pagina, datosPagina()));
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.type('html').set({ 'Cache-Control': 'no-cache', 'Content-Security-Policy': politica(nonce) })
+    .send(plantilla(pagina, { ...datosPagina(), nonce }));
 });
 app.use(express.static(PUBLIC, { index: false }));
 
@@ -219,7 +248,14 @@ async function procesarPago(paymentId) {
   const pago = await new Payment(mpClient).get({ id: paymentId });
   const citaId = Number(pago.external_reference);
   if (!citaId) return { estado: pago.status };
-  if (pago.status === 'approved') return { estado: 'approved', cita: await marcarPagada(citaId) };
+  if (pago.status === 'approved') {
+    const precio = db.prepare('SELECT precio FROM citas WHERE id = ?').get(citaId)?.precio;
+    if (precio === undefined || pago.currency_id !== 'MXN' || Number(pago.transaction_amount) < precio) {
+      console.error(`[pago] El pago ${paymentId} no coincide con el precio de la cita ${citaId}: no se agenda.`);
+      return { estado: 'monto_invalido', cita: citaCompleta('c.id = ?', citaId) };
+    }
+    return { estado: 'approved', cita: await marcarPagada(citaId) };
+  }
   return { estado: pago.status, cita: citaCompleta('c.id = ?', citaId) };
 }
 
@@ -269,16 +305,39 @@ app.get('/api/disponibilidad', (req, res) => {
   res.json({ fecha, slots: slotsDelDia(barberoId, fecha, servicio.duracion) });
 });
 
-app.post('/api/reservas', async (req, res) => {
+// Límite simple por IP (en memoria): evita que alguien aparte todos los horarios sin pagar
+function limitePorIp(max, ventanaMs, mensaje) {
+  const usos = new Map(); // ip -> [instantes]
+  setInterval(() => {
+    const desde = Date.now() - ventanaMs;
+    for (const [ip, v] of usos) { const r = v.filter((t) => t > desde); r.length ? usos.set(ip, r) : usos.delete(ip); }
+  }, ventanaMs).unref();
+  return (req, res, next) => {
+    const ahora = Date.now(), v = (usos.get(req.ip) || []).filter((t) => t > ahora - ventanaMs);
+    if (v.length >= max) return res.status(429).json({ error: mensaje });
+    v.push(ahora); usos.set(req.ip, v); next();
+  };
+}
+const DIAS_MAXIMOS = 60; // hasta cuántos días adelante se puede reservar
+const CORREO = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
+
+app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas seguidas. Espera unos minutos e intenta de nuevo.'), async (req, res) => {
   try {
     const { nombre, email, telefono, barberoId, servicioId, fecha, hora } = req.body || {};
-    const n = String(nombre || '').trim();
+    // Sin caracteres de control ni < >: el nombre viaja a correos, a Mercado Pago y al panel
+    const n = String(nombre || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
     const e = String(email || '').trim().toLowerCase();
-    const t = String(telefono || '').replace(/[^\d+]/g, '');
+    const t = String(telefono || '').replace(/[^\d+]/g, '').slice(0, 15);
     if (n.length < 2 || n.length > 80) return res.status(400).json({ error: 'Escribe tu nombre' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return res.status(400).json({ error: 'Correo inválido' });
+    if (e.length > 100 || !CORREO.test(e)) return res.status(400).json({ error: 'Correo inválido' });
     if (t.replace(/\D/g, '').length < 10) return res.status(400).json({ error: 'Teléfono inválido (10 dígitos)' });
     if (!fechaValida(String(fecha)) || !/^\d{2}:\d{2}$/.test(String(hora))) return res.status(400).json({ error: 'Fecha u hora inválida' });
+    const limite = new Date(Date.parse(ahoraMX().fecha + 'T12:00:00Z') + DIAS_MAXIMOS * 86400000).toISOString().slice(0, 10);
+    if (fecha > limite) return res.status(400).json({ error: `Solo se puede reservar con hasta ${DIAS_MAXIMOS} días de anticipación` });
+    // Un mismo teléfono no puede tener más de 2 horarios apartados sin pagar a la vez
+    const apartadas = db.prepare(`SELECT COUNT(*) AS n FROM citas WHERE cliente_tel = ? AND estado = 'pendiente'
+                                  AND creada_en > datetime('now', ?)`).get(t, `-${HOLD_MINUTES} minutes`).n;
+    if (apartadas >= 2) return res.status(429).json({ error: 'Ya tienes horarios apartados. Termina tu pago o espera 15 minutos.' });
 
     const servicio = db.prepare('SELECT * FROM servicios WHERE id = ? AND activo = 1').get(Number(servicioId));
     const barbero = db.prepare('SELECT * FROM barberos WHERE id = ? AND activo = 1').get(Number(barberoId));
@@ -344,9 +403,12 @@ app.get('/api/reservas/confirmar', async (req, res) => {
   try {
     if (MODO_DEMO) return res.status(400).json({ error: 'Modo demo' });
     const paymentId = String(req.query.payment_id || req.query.collection_id || '');
-    if (!paymentId) return res.status(400).json({ error: 'Falta el pago' });
+    const preferenceId = String(req.query.preference_id || '');
+    if (!/^\d{1,20}$/.test(paymentId)) return res.status(400).json({ error: 'Falta el pago' });
     const r = await procesarPago(paymentId);
-    if (!r.cita) return res.status(404).json({ error: 'Cita no encontrada' });
+    // Mercado Pago regresa al cliente con su preference_id: sin él no mostramos datos de la cita
+    // (evita que alguien consulte citas ajenas probando números de pago)
+    if (!r.cita || !preferenceId || r.cita.mp_preference_id !== preferenceId) return res.status(404).json({ error: 'Cita no encontrada' });
     if (r.estado !== 'approved') return res.status(402).json({ error: 'pendiente', ...publica(r.cita) });
     res.json(publica(r.cita));
   } catch (err) {
@@ -372,14 +434,17 @@ app.post('/api/demo/:codigo/pagar', async (req, res) => {
 
 // ---------- admin ----------
 const intentos = new Map(); // ip -> {n, hasta}
+setInterval(() => { const ahora = Date.now(); for (const [ip, r] of intentos) if (r.hasta < ahora) intentos.delete(ip); }, 15 * 60 * 1000).unref();
+// La llave de la sesión incluye la contraseña: si se cambia ADMIN_PASS, todas las sesiones abiertas dejan de valer
+const LLAVE_SESION = crypto.createHash('sha256').update(`${SESSION_SECRET}|${ADMIN_USER}|${ADMIN_PASS}`).digest();
 const firmar = (payload) => {
   const b = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  return `${b}.${crypto.createHmac('sha256', SESSION_SECRET).update(b).digest('base64url')}`;
+  return `${b}.${crypto.createHmac('sha256', LLAVE_SESION).update(b).digest('base64url')}`;
 };
 function verificar(token) {
-  if (!token || !token.includes('.')) return null;
+  if (typeof token !== 'string' || token.length > 500 || !token.includes('.')) return null;
   const [b, sig] = token.split('.');
-  const esperado = crypto.createHmac('sha256', SESSION_SECRET).update(b).digest('base64url');
+  const esperado = crypto.createHmac('sha256', LLAVE_SESION).update(b).digest('base64url');
   const a = Buffer.from(sig), z = Buffer.from(esperado);
   if (a.length !== z.length || !crypto.timingSafeEqual(a, z)) return null;
   try {
@@ -556,6 +621,14 @@ async function enviarRecordatorios() {
 const revisarRecordatorios = () => enviarRecordatorios().catch((e) => console.error('[recordatorios]', e.message));
 setTimeout(revisarRecordatorios, 30 * 1000);
 setInterval(revisarRecordatorios, 10 * 60 * 1000);
+
+// Errores: nunca se muestran rutas ni el stack del servidor al visitante
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Solicitud inválida' });
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Solicitud demasiado grande' });
+  console.error(err);
+  res.status(500).json({ error: 'Error del servidor' });
+});
 
 app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);

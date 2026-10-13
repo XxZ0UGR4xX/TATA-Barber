@@ -22,9 +22,10 @@
     <a class="btn ghost" href="index.html" style="margin-top:10px">Agendar otra cita</a>
   </section>
 </main>
-<script>
+<script nonce="{{nonce}}">
 const params = new URLSearchParams(location.search);
-const money = (n) => '$' + n + ' MXN';
+const money = (n) => '$' + Number(n) + ' MXN';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const titulo = (t) => { document.getElementById('titulo').textContent = t; };
 const codigo = (c) => {
   document.getElementById('codigo-txt').textContent = c.codigo;
@@ -35,10 +36,10 @@ function pinta(c) {
   const f = new Date(c.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
   document.getElementById('sub').textContent = '¡Nos vemos pronto, ' + c.cliente + '!';
   document.getElementById('resumen').innerHTML = `
-    <dt>Servicio</dt><dd>${c.servicio}</dd>
-    <dt>Barbero</dt><dd>${c.barbero}</dd>
-    <dt>Día</dt><dd style="text-transform:capitalize">${f}</dd>
-    <dt>Hora</dt><dd>${c.hora} (${c.duracion} min)</dd>
+    <dt>Servicio</dt><dd>${esc(c.servicio)}</dd>
+    <dt>Barbero</dt><dd>${esc(c.barbero)}</dd>
+    <dt>Día</dt><dd style="text-transform:capitalize">${esc(f)}</dd>
+    <dt>Hora</dt><dd>${esc(c.hora)} (${Number(c.duracion)} min)</dd>
     <dt>Pagado</dt><dd>${money(c.precio)}</dd>`;
   codigo(c);
   document.getElementById('mail-nota').classList.remove('hidden');
@@ -50,10 +51,11 @@ async function run() {
     const estadoMP = params.get('status') || params.get('collection_status');
     let c, r;
     if (pid) {
-      r = await fetch('/api/reservas/confirmar?payment_id=' + encodeURIComponent(pid));
+      const q = new URLSearchParams({ payment_id: pid, preference_id: params.get('preference_id') || '' });
+      r = await fetch('/api/reservas/confirmar?' + q);
       c = await r.json();
     } else if (params.get('codigo')) {
-      c = await (await fetch('/api/demo/' + params.get('codigo'))).json();
+      c = await (await fetch('/api/demo/' + encodeURIComponent(params.get('codigo')))).json();
     }
     if (c && c.codigo && c.estado === 'conflicto') {
       // Pagó, pero el horario se ocupó mientras pagaba: la barbería lo contacta
