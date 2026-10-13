@@ -81,11 +81,41 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
 .hero p { color: var(--muted); max-width: 560px; }
 
 .steps { display: flex; gap: 6px; margin: 8px 0 20px; flex-wrap: wrap; }
-.steps span {
-  font-size: .8rem; padding: 4px 10px; border-radius: 99px;
-  border: 1px solid var(--line); color: var(--muted);
+.steps button {
+  font: inherit; font-size: .8rem; padding: 5px 12px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--line); color: var(--muted); background: rgba(11, 11, 11, .6);
+  transition: border-color .15s, color .15s, background .15s;
 }
-.steps span.on { border-color: var(--accent); color: var(--accent); background: var(--gold-soft); }
+.steps button:disabled { opacity: .4; cursor: default; }
+.steps button.hecho { border-color: var(--gold-line); color: var(--gold); }
+.steps button.hecho::before { content: "✓ "; }
+.steps button.hecho:hover { border-color: var(--gold); }
+.steps button.actual { border-color: var(--gold); color: var(--accent-ink); background: var(--gold-grad); font-weight: 600; }
+
+/* Asistente de reserva: un paso a la vez */
+.reserva { scroll-margin-top: 12px; }
+.eleccion { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.eleccion:empty { display: none; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 8px; padding: 7px 12px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line); background: rgba(20, 20, 20, .84); color: var(--text); font: inherit; font-size: .85rem; text-align: left;
+}
+.chip small { color: var(--muted); font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
+.chip b { font-weight: 600; }
+.chip span { color: var(--gold); font-size: .78rem; text-decoration: underline; text-underline-offset: 2px; }
+.chip:hover { border-color: var(--gold-line); }
+.paso-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.paso-head h2 { margin: 0; outline: none; }
+.atras {
+  flex: none; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); background: transparent;
+  color: var(--text); font: inherit; font-size: .8rem; cursor: pointer;
+}
+.atras:hover { border-color: var(--gold); color: var(--gold); }
+.entra-adelante { animation: entra-der .25s ease-out; }
+.entra-atras { animation: entra-izq .25s ease-out; }
+@keyframes entra-der { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+@keyframes entra-izq { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .entra-adelante, .entra-atras { animation: none; } }
 
 .card {
   background: rgba(20, 20, 20, .84); border: 1px solid var(--line); border-radius: var(--radius);
@@ -158,7 +188,12 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 
 .summary { display: grid; gap: 4px 16px; grid-template-columns: auto 1fr; margin: 0 0 16px; }
 .summary dt { color: var(--muted); }
-.summary dd { margin: 0; font-weight: 600; }
+.summary dd { margin: 0; font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.summary .cap { text-transform: capitalize; }
+.cambiar {
+  flex: none; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; font-size: .8rem; font-weight: 400;
+  color: var(--gold); text-decoration: underline; text-underline-offset: 2px;
+}
 
 .msg { padding: 10px 14px; border-radius: 8px; margin: 10px 0; }
 .msg.err { background: #2a1513; color: #ffb4a9; }

@@ -32,51 +32,59 @@
     <p>Elige servicio, barbero, día y hora. Paga en línea y tu cita queda confirmada al instante.</p>
   </section>
 
-  <div class="steps">
-    <span data-step="1" class="on">1 · Servicio</span>
-    <span data-step="2">2 · Barbero</span>
-    <span data-step="3">3 · Día y hora</span>
-    <span data-step="4">4 · Tus datos</span>
-    <span data-step="5">5 · Pago</span>
-  </div>
+  <section class="reserva" id="reserva" aria-label="Reserva tu cita">
+    <nav class="steps" id="pasos" aria-label="Pasos de la reserva">
+      <button type="button" data-ir="1">1 · Servicio</button>
+      <button type="button" data-ir="2">2 · Barbero</button>
+      <button type="button" data-ir="3">3 · Día y hora</button>
+      <button type="button" data-ir="4">4 · Tus datos</button>
+      <button type="button" data-ir="5">5 · Pago</button>
+    </nav>
 
-  <div id="msg"></div>
+    <!-- Lo que ya eligió, con opción de cambiarlo -->
+    <div class="eleccion" id="eleccion"></div>
 
-  <section class="card" id="box-servicio">
-    <h2>1 · Elige tu servicio</h2>
-    <div class="grid" id="servicios"></div>
-  </section>
+    <div id="msg"></div>
 
-  <section class="card hidden" id="box-barbero">
-    <h2>2 · Elige tu barbero</h2>
-    <div class="grid" id="barberos"></div>
-  </section>
+    <section class="card paso-card" id="paso-1" data-paso="1">
+      <div class="paso-head"><h2 tabindex="-1">1 · Elige tu servicio</h2></div>
+      <div class="grid" id="servicios"></div>
+    </section>
 
-  <section class="card hidden" id="box-fecha">
-    <h2>3 · Día y horario</h2>
-    <div class="days" id="dias"></div>
-    <div id="slots-wrap">
-      <p class="muted" id="slots-hint">Selecciona un día para ver los horarios.</p>
-      <div class="slots" id="slots"></div>
-    </div>
-  </section>
+    <section class="card paso-card hidden" id="paso-2" data-paso="2">
+      <div class="paso-head"><button type="button" class="atras" data-ir="1">← Atrás</button><h2 tabindex="-1">2 · Elige tu barbero</h2></div>
+      <div class="grid" id="barberos"></div>
+    </section>
 
-  <section class="card hidden" id="box-datos">
-    <h2>4 · Tus datos</h2>
-    <div class="form-grid">
-      <div><label>Nombre completo</label><input id="f-nombre" autocomplete="name" placeholder="Juan Pérez" /></div>
-      <div><label>Correo electrónico</label><input id="f-email" type="email" autocomplete="email" placeholder="tucorreo@gmail.com" /></div>
-      <div><label>Teléfono (WhatsApp)</label><input id="f-tel" type="tel" autocomplete="tel" placeholder="449 123 4567" /></div>
-    </div>
-    <p class="muted nota-legal">Usamos tus datos solo para agendar y confirmar tu cita. Consulta nuestro
-      <a href="privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a>.</p>
-  </section>
+    <section class="card paso-card hidden" id="paso-3" data-paso="3">
+      <div class="paso-head"><button type="button" class="atras" data-ir="2">← Atrás</button><h2 tabindex="-1">3 · Día y horario</h2></div>
+      <div class="days" id="dias"></div>
+      <div id="slots-wrap">
+        <p class="muted" id="slots-hint">Selecciona un día para ver los horarios.</p>
+        <div class="slots" id="slots"></div>
+      </div>
+    </section>
 
-  <section class="card hidden" id="box-pago">
-    <h2>5 · Confirma y paga</h2>
-    <dl class="summary" id="resumen"></dl>
-    <button class="btn" id="btn-pagar">Pagar y agendar cita</button>
-    <p class="muted" id="pago-nota" style="margin-top:10px"></p>
+    <section class="card paso-card hidden" id="paso-4" data-paso="4">
+      <div class="paso-head"><button type="button" class="atras" data-ir="3">← Atrás</button><h2 tabindex="-1">4 · Tus datos</h2></div>
+      <form id="form-datos" novalidate>
+        <div class="form-grid">
+          <div><label for="f-nombre">Nombre completo</label><input id="f-nombre" name="nombre" autocomplete="name" maxlength="80" placeholder="Juan Pérez" /></div>
+          <div><label for="f-email">Correo electrónico</label><input id="f-email" name="email" type="email" autocomplete="email" maxlength="100" placeholder="tucorreo@gmail.com" /></div>
+          <div><label for="f-tel">Teléfono (WhatsApp)</label><input id="f-tel" name="telefono" type="tel" autocomplete="tel" maxlength="20" placeholder="449 123 4567" /></div>
+        </div>
+        <p class="muted nota-legal">Usamos tus datos solo para agendar y confirmar tu cita. Consulta nuestro
+          <a href="privacidad.html" target="_blank" rel="noopener">aviso de privacidad</a>.</p>
+        <button class="btn" type="submit" style="margin-top:14px">Continuar →</button>
+      </form>
+    </section>
+
+    <section class="card paso-card hidden" id="paso-5" data-paso="5">
+      <div class="paso-head"><button type="button" class="atras" data-ir="4">← Atrás</button><h2 tabindex="-1">5 · Confirma y paga</h2></div>
+      <dl class="summary" id="resumen"></dl>
+      <button class="btn" id="btn-pagar">Pagar y agendar cita</button>
+      <p class="muted" id="pago-nota" style="margin-top:10px"></p>
+    </section>
   </section>
 </main>
 
@@ -125,7 +133,7 @@
       <h2>¿Listo para tu próximo corte?</h2>
       <p>Aparta tu horario en línea en menos de un minuto y paga de forma segura. Tu barbero te estará esperando.</p>
     </div>
-    <a class="btn outline" href="#box-servicio">Reservar ahora
+    <a class="btn outline" href="#reserva">Reservar ahora
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
     </a>
   </div>
@@ -182,7 +190,7 @@
       <h4>Sitio</h4>
       <ul class="f-list">
         <li><a href="#top">Inicio</a></li>
-        <li><a href="#box-servicio">Reservar cita</a></li>
+        <li><a href="#reserva">Reservar cita</a></li>
         <li class="solo-referencias"><a href="#referencias">Referencias</a></li>
         <li><a href="#tienda">Tienda</a></li>
         <li><a href="{{mapa}}" target="_blank" rel="noopener">Cómo llegar</a></li>
@@ -207,26 +215,69 @@ const NEGOCIO = {{{negocioJson}}}; // datos del negocio (los llena el servidor)
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); // todo dato va escapado al HTML
 const money = (n) => '$' + n + ' MXN';
-const st = { servicio: null, barbero: null, fecha: null, hora: null, config: null };
+const st = { paso: 1, servicio: null, barbero: null, fecha: null, hora: null, datos: null, config: null };
+const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const fechaLarga = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+const fechaCorta = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
 
 function msg(text, tipo = 'err') {
   $('#msg').innerHTML = text ? `<div class="msg ${tipo === 'info' ? 'info' : 'err'}">${esc(text)}</div>` : '';
   if (text) $('#msg').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-function paso(n) {
-  document.querySelectorAll('.steps span').forEach((s) => s.classList.toggle('on', Number(s.dataset.step) <= n));
+
+// ---------- Asistente de reserva: un paso a la vez, se puede regresar a cambiar ----------
+// completo(n): ya eligió lo de ese paso · alcanzable(n): ya puede entrar a ese paso
+const completo = (n) => [false, !!st.servicio, !!st.barbero, !!(st.fecha && st.hora), !!st.datos, false][n];
+const alcanzable = (n) => n === 1 || (completo(n - 1) && alcanzable(n - 1));
+
+function irA(n, { historial = true } = {}) {
+  if (!alcanzable(n)) return;
+  const antes = st.paso;
+  st.paso = n;
+  document.querySelectorAll('.paso-card').forEach((c) => c.classList.toggle('hidden', Number(c.dataset.paso) !== n));
+  const card = $('#paso-' + n);
+  card.classList.remove('entra-adelante', 'entra-atras');
+  void card.offsetWidth; // reinicia la animación
+  card.classList.add(n >= antes ? 'entra-adelante' : 'entra-atras');
+  msg('');
+  pintarPasos();
+  if (n === 3) { if (!st.fecha) elegirPrimerDia(); marcarDia(); cargarSlots(); }
+  if (n === 5) pintarResumen();
+  if (historial && n !== antes) history.pushState({ paso: n }, '');
+  // El paso nuevo aparece en el mismo lugar: si el asistente quedó fuera de la vista, se sube a él
+  const arriba = $('#reserva').getBoundingClientRect().top;
+  const suave = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  if (arriba < 0 || arriba > innerHeight * 0.5) $('#reserva').scrollIntoView({ behavior: suave, block: 'start' });
+  if (n !== antes) card.querySelector('h2').focus({ preventScroll: true });
 }
+
+function pintarPasos() {
+  document.querySelectorAll('#pasos [data-ir]').forEach((b) => {
+    const n = Number(b.dataset.ir);
+    b.disabled = !alcanzable(n);
+    b.classList.toggle('actual', n === st.paso);
+    b.classList.toggle('hecho', n !== st.paso && completo(n));
+    b.toggleAttribute('aria-current', n === st.paso);
+  });
+  // Chips con lo ya elegido (menos lo del paso actual); el resumen del paso 5 ya los muestra
+  const chips = [];
+  if (st.servicio) chips.push([1, 'Servicio', `${st.servicio.nombre} · ${money(st.servicio.precio)}`]);
+  if (st.barbero) chips.push([2, 'Barbero', st.barbero.nombre]);
+  if (st.fecha && st.hora) chips.push([3, 'Cita', `${fechaCorta(st.fecha)} · ${st.hora}`]);
+  $('#eleccion').innerHTML = st.paso === 5 ? '' : chips.filter(([n]) => n !== st.paso).map(([n, k, v]) =>
+    `<button type="button" class="chip" data-ir="${n}"><small>${k}</small><b>${esc(v)}</b><span>Cambiar</span></button>`).join('');
+}
+
+const marcarSel = (cont, id) => document.querySelectorAll(`${cont} .opt`).forEach((o) => o.classList.toggle('sel', Number(o.dataset.id) === id));
 
 async function init() {
   st.config = await (await fetch('/api/config')).json();
-  // Servicios
   $('#servicios').innerHTML = st.config.servicios.map((s) => `
     <button class="opt" data-id="${Number(s.id)}">
       <div class="t">${esc(s.nombre)}</div>
       <div class="s">${esc(s.descripcion)} · ${Number(s.duracion)} min</div>
       <div class="p">${money(Number(s.precio))}</div>
     </button>`).join('');
-  // Barberos
   $('#barberos').innerHTML = st.config.barberos.map((b) => `
     <button class="opt" data-id="${Number(b.id)}">
       <div class="avatar">${esc(b.nombre[0])}</div>
@@ -235,21 +286,35 @@ async function init() {
   construirDias();
   pintarHorario(st.config.horario);
 
-  $('#servicios').onclick = (e) => pick(e, 'servicio', st.config.servicios, () => { show('#box-barbero'); paso(2); });
-  $('#barberos').onclick = (e) => pick(e, 'barbero', st.config.barberos, () => { show('#box-fecha'); paso(3); cargarSlots(); });
+  $('#servicios').onclick = (e) => {
+    const btn = e.target.closest('.opt'); if (!btn) return;
+    const s = st.config.servicios.find((x) => x.id === Number(btn.dataset.id));
+    if (st.servicio && st.servicio.id !== s.id) st.hora = null; // otra duración: hay que volver a elegir hora
+    st.servicio = s; marcarSel('#servicios', s.id);
+    irA(2);
+  };
+  $('#barberos').onclick = (e) => {
+    const btn = e.target.closest('.opt'); if (!btn) return;
+    const b = st.config.barberos.find((x) => x.id === Number(btn.dataset.id));
+    if (st.barbero && st.barbero.id !== b.id) st.hora = null; // otro barbero: otros horarios libres
+    st.barbero = b; marcarSel('#barberos', b.id);
+    irA(3);
+  };
+  history.replaceState({ paso: 1 }, '');
+  pintarPasos();
   if (new URLSearchParams(location.search).get('cancelado')) msg('Cancelaste el pago. Tu horario sigue disponible, puedes intentar de nuevo.', 'info');
 }
 
-function pick(e, key, lista, luego) {
-  const btn = e.target.closest('.opt'); if (!btn) return;
-  btn.parentElement.querySelectorAll('.opt').forEach((o) => o.classList.remove('sel'));
-  btn.classList.add('sel');
-  st[key] = lista.find((x) => x.id === Number(btn.dataset.id));
-  if (key === 'servicio' || key === 'barbero') { st.hora = null; }
-  luego();
-  actualizarResumen();
-}
-function show(sel) { $(sel).classList.remove('hidden'); }
+// Pasos, chips, "Atrás" y "Cambiar" llevan data-ir con el paso al que regresan
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ir]');
+  if (b && !b.disabled) irA(Number(b.dataset.ir));
+});
+// El botón "atrás" del navegador o del celular regresa un paso en vez de salir del sitio
+addEventListener('popstate', (e) => {
+  const n = e.state && e.state.paso;
+  if (n) irA(alcanzable(n) ? n : 1, { historial: false });
+});
 
 // Horario del pie de página: agrupa días seguidos con el mismo horario (Lun a Jue 10:00–19:00)
 function pintarHorario(horario) {
@@ -272,76 +337,91 @@ function pintarHorario(horario) {
 function construirDias() {
   const cont = $('#dias'); cont.innerHTML = '';
   const hoy = new Date(st.config.hoy + 'T12:00:00');
-  const dOut = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   for (let i = 0; i < 21; i++) {
     const d = new Date(hoy); d.setDate(d.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
-    const cerrado = st.config.diasCerrados.includes(d.getDay());
     const b = document.createElement('button');
-    b.className = 'day'; b.disabled = cerrado; b.dataset.fecha = iso;
-    b.innerHTML = `<small>${dOut[d.getDay()]}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('es-MX',{month:'short'})}</small>`;
-    b.onclick = () => {
-      cont.querySelectorAll('.day').forEach((x) => x.classList.remove('sel'));
-      b.classList.add('sel'); st.fecha = iso; st.hora = null; cargarSlots(); actualizarResumen();
-    };
+    b.className = 'day'; b.disabled = st.config.diasCerrados.includes(d.getDay()); b.dataset.fecha = iso;
+    b.innerHTML = `<small>${DIAS[d.getDay()]}</small><b>${d.getDate()}</b><small>${esc(d.toLocaleDateString('es-MX', { month: 'short' }))}</small>`;
+    b.onclick = () => { st.fecha = iso; st.hora = null; marcarDia(); cargarSlots(); pintarPasos(); };
     cont.appendChild(b);
   }
+}
+function elegirPrimerDia() {
+  const d = document.querySelector('#dias .day:not([disabled])');
+  if (d) st.fecha = d.dataset.fecha;
+}
+function marcarDia() {
+  document.querySelectorAll('#dias .day').forEach((x) => x.classList.toggle('sel', x.dataset.fecha === st.fecha));
+  const sel = document.querySelector('#dias .day.sel');
+  if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 async function cargarSlots() {
   if (!st.servicio || !st.barbero || !st.fecha) return;
+  const pedido = `${st.barbero.id}|${st.servicio.id}|${st.fecha}`;
+  cargarSlots.ultimo = pedido;
   $('#slots-hint').textContent = 'Cargando horarios…';
   $('#slots').innerHTML = '';
   const q = new URLSearchParams({ barbero: st.barbero.id, servicio: st.servicio.id, fecha: st.fecha });
-  const r = await fetch('/api/disponibilidad?' + q);
-  const data = await r.json();
-  if (!data.slots || !data.slots.length) { $('#slots-hint').textContent = 'No hay horarios disponibles ese día. Prueba otro.'; return; }
-  const libres = data.slots.filter((s) => s.disponible).length;
+  const data = await (await fetch('/api/disponibilidad?' + q)).json();
+  if (cargarSlots.ultimo !== pedido) return; // ya eligió otro día mientras cargaba
+  const slots = data.slots || [];
+  if (!slots.length) { $('#slots-hint').textContent = 'Ese día no abrimos. Prueba otro.'; st.hora = null; pintarPasos(); return; }
+  const libres = slots.filter((s) => s.disponible).length;
   $('#slots-hint').textContent = libres ? `${libres} horarios disponibles:` : 'Todo ocupado ese día. Prueba otro.';
-  $('#slots').innerHTML = data.slots.map((s) =>
-    `<button class="slot" data-hora="${esc(s.hora)}" ${s.disponible ? '' : 'disabled'}>${esc(s.hora)}</button>`).join('');
+  if (st.hora && !slots.some((s) => s.hora === st.hora && s.disponible)) { st.hora = null; pintarPasos(); }
+  $('#slots').innerHTML = slots.map((s) =>
+    `<button class="slot${s.hora === st.hora ? ' sel' : ''}" data-hora="${esc(s.hora)}" ${s.disponible ? '' : 'disabled'}>${esc(s.hora)}</button>`).join('');
   $('#slots').onclick = (e) => {
     const b = e.target.closest('.slot'); if (!b || b.disabled) return;
-    $('#slots').querySelectorAll('.slot').forEach((x) => x.classList.remove('sel'));
-    b.classList.add('sel'); st.hora = b.dataset.hora;
-    show('#box-datos'); paso(4); actualizarResumen();
+    st.hora = b.dataset.hora;
+    $('#slots').querySelectorAll('.slot').forEach((x) => x.classList.toggle('sel', x === b));
+    irA(4);
   };
 }
 
-function datosCliente() {
-  return { nombre: $('#f-nombre').value.trim(), email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim() };
-}
-function actualizarResumen() {
-  if (!(st.servicio && st.barbero && st.fecha && st.hora)) return;
-  const f = new Date(st.fecha + 'T12:00:00').toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
-  $('#resumen').innerHTML = `
-    <dt>Servicio</dt><dd>${esc(st.servicio.nombre)}</dd>
-    <dt>Barbero</dt><dd>${esc(st.barbero.nombre)}</dd>
-    <dt>Día</dt><dd style="text-transform:capitalize">${esc(f)}</dd>
-    <dt>Hora</dt><dd>${esc(st.hora)} (${Number(st.servicio.duracion)} min)</dd>
-    <dt>Total</dt><dd>${money(Number(st.servicio.precio))}</dd>`;
-  show('#box-pago'); paso(5);
+// Paso 4: datos del cliente
+$('#form-datos').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const d = { nombre: $('#f-nombre').value.trim(), email: $('#f-email').value.trim(), telefono: $('#f-tel').value.trim() };
+  if (d.nombre.length < 2) return msg('Escribe tu nombre completo.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) return msg('Revisa tu correo electrónico.');
+  if (d.telefono.replace(/\D/g, '').length < 10) return msg('Escribe tu teléfono a 10 dígitos.');
+  st.datos = d;
+  irA(5);
+});
+
+// Paso 5: resumen con "Cambiar" en cada dato
+function pintarResumen() {
+  const filas = [
+    ['Servicio', st.servicio.nombre, 1],
+    ['Barbero', st.barbero.nombre, 2],
+    ['Día', fechaLarga(st.fecha), 3],
+    ['Hora', `${st.hora} (${Number(st.servicio.duracion)} min)`, 3],
+    ['Tus datos', `${st.datos.nombre} · ${st.datos.telefono}`, 4],
+    ['Total', money(Number(st.servicio.precio)), 0],
+  ];
+  $('#resumen').innerHTML = filas.map(([k, v, n]) => `<dt>${k}</dt><dd><span class="${k === 'Día' ? 'cap' : ''}">${esc(v)}</span>${
+    n ? `<button type="button" class="cambiar" data-ir="${n}">Cambiar</button>` : ''}</dd>`).join('');
   $('#pago-nota').textContent = st.config.demo
     ? 'Modo demostración: el pago se simula (no se cobra nada real).'
     : 'Serás redirigido a la pasarela de pago segura.';
 }
 
-['#f-nombre','#f-email','#f-tel'].forEach((s) => document.addEventListener('input', (e)=>{ if(e.target.matches(s)) {} }));
-
 $('#btn-pagar').onclick = async () => {
-  const d = datosCliente();
-  if (!d.nombre || !d.email || !d.telefono) return msg('Completa tu nombre, correo y teléfono.');
-  if (!(st.servicio && st.barbero && st.fecha && st.hora)) return msg('Completa todos los pasos.');
+  if (!alcanzable(5)) return msg('Completa todos los pasos.');
   msg('');
   $('#btn-pagar').disabled = true; $('#btn-pagar').textContent = 'Procesando…';
   try {
     const r = await fetch('/api/reservas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...d, barberoId: st.barbero.id, servicioId: st.servicio.id, fecha: st.fecha, hora: st.hora }),
+      body: JSON.stringify({ ...st.datos, barberoId: st.barbero.id, servicioId: st.servicio.id, fecha: st.fecha, hora: st.hora }),
     });
     const data = await r.json();
-    if (!r.ok) { msg(data.error || 'No se pudo reservar.'); if (r.status === 409) cargarSlots(); return; }
-    location.href = data.url;
+    if (r.ok) { location.href = data.url; return; }
+    if (r.status === 409) { st.hora = null; irA(3); } // ese horario ya lo tomó alguien: a elegir otro
+    msg(data.error || 'No se pudo reservar.');
   } catch { msg('Error de conexión. Intenta de nuevo.'); }
   finally { $('#btn-pagar').disabled = false; $('#btn-pagar').textContent = 'Pagar y agendar cita'; }
 };
