@@ -66,7 +66,8 @@ CVC). Cuando todo funcione, cambia el token por el de producción (`APP_USR-…`
 
 ## Personalizar barberos, servicios y horario
 - **Barberos, servicios, precios y horario**: entra al panel (`/admin.html`) → pestaña
-  **"Barberos, servicios y horario"**. Los cambios se ven en el sitio al instante, sin redesplegar.
+  **"Configuración"**. Ahí también se cambian el nombre, la dirección, el teléfono, el WhatsApp y las redes.
+  Los cambios se ven en el sitio al instante, sin redesplegar.
 
 ## Alternativa: Railway (con Docker)
 El proyecto incluye `Dockerfile`. En https://railway.app → New Project → Deploy from repo.

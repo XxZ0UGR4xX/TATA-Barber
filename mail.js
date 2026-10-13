@@ -46,6 +46,17 @@ function tablaHtml(cita) {
     .join('')}</table>`;
 }
 
+// Pie de los correos al cliente: dónde y cómo contactar a la barbería
+function pie(n) {
+  if (!n) return { text: '', html: '' };
+  const lineas = [n.nombre, `${n.direccion}, ${n.ciudadEstado}`, n.telefono && `Tel. ${n.telefono}`].filter(Boolean);
+  return {
+    text: '\n\n' + lineas.join('\n'),
+    html: `<p style="font-family:Arial,sans-serif;color:#666;font-size:13px;border-top:1px solid #eee;padding-top:12px;margin-top:18px">
+             ${lineas.map(esc).join('<br>')}${n.mapa ? `<br><a href="${esc(n.mapa)}">Cómo llegar</a>` : ''}</p>`,
+  };
+}
+
 async function enviar(opts) {
   const t = getTransporter();
   if (!t) {
@@ -68,14 +79,15 @@ async function avisarBarberia(cita) {
   });
 }
 
-// Correo de confirmación al cliente
-async function confirmarCliente(cita) {
+// Correo de confirmación al cliente (n = datos del negocio para el pie)
+async function confirmarCliente(cita, n) {
+  const p = pie(n);
   await enviar({
     to: cita.cliente_email,
     subject: `Tu cita está confirmada · ${fechaLarga(cita.fecha)} ${cita.hora}`,
-    text: `Hola ${cita.cliente_nombre}, tu cita quedó confirmada.\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    text: `Hola ${cita.cliente_nombre}, tu cita quedó confirmada.\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') + p.text,
     html: `<h2 style="font-family:Arial,sans-serif">¡Tu cita está confirmada, ${esc(cita.cliente_nombre)}!</h2>${tablaHtml(cita)}
-           <p style="font-family:Arial,sans-serif;color:#666">Te esperamos. Llega 5 minutos antes.</p>`,
+           <p style="font-family:Arial,sans-serif;color:#666">Te esperamos. Llega 5 minutos antes.</p>${p.html}`,
   });
 }
 
@@ -94,15 +106,16 @@ async function avisarConflicto(cita) {
   });
 }
 
-async function conflictoCliente(cita) {
+async function conflictoCliente(cita, n) {
+  const p = pie(n);
   const nota = 'Recibimos tu pago, pero ese horario se ocupó mientras pagabas. ' +
     'Nos pondremos en contacto contigo para reagendar tu cita o devolverte tu dinero.';
   await enviar({
     to: cita.cliente_email,
     subject: `Recibimos tu pago · Vamos a reagendar tu cita`,
-    text: `Hola ${cita.cliente_nombre}. ${nota}\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n'),
+    text: `Hola ${cita.cliente_nombre}. ${nota}\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') + p.text,
     html: `<h2 style="font-family:Arial,sans-serif">Hola ${esc(cita.cliente_nombre)}, recibimos tu pago</h2>
-           <p style="font-family:Arial,sans-serif">${esc(nota)}</p>${tablaHtml(cita)}`,
+           <p style="font-family:Arial,sans-serif">${esc(nota)}</p>${tablaHtml(cita)}${p.html}`,
   });
 }
 

@@ -9,10 +9,11 @@
   --muted: #a8a399;
   --gold: #d8b45f;
   --gold-light: #f1d792;
-  --gold-dark: #a8812f;
-  --gold-soft: rgba(216, 180, 94, .12);
-  --gold-line: rgba(216, 180, 94, .35);
-  --gold-grad: linear-gradient(135deg, #f1d792 0%, #d8b45f 45%, #b88a35 100%);
+  --gold-dark: #b88a35;
+  /* Tonos derivados del acento: se recalculan si negocio.js cambia los colores */
+  --gold-soft: color-mix(in srgb, var(--gold) 12%, transparent);
+  --gold-line: color-mix(in srgb, var(--gold) 35%, transparent);
+  --gold-grad: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 45%, var(--gold-dark) 100%);
   --accent: var(--gold);
   --accent-ink: #0b0b0b;
   --ok: #6fbf73;
@@ -132,7 +133,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
   font-size: .9rem; letter-spacing: .14em; text-transform: uppercase; text-decoration: none;
   transition: box-shadow .2s, filter .2s, background-color .2s, color .2s, border-color .2s;
 }
-.btn:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 6px 24px rgba(216, 180, 94, .25); }
+.btn:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 6px 24px color-mix(in srgb, var(--gold) 25%, transparent); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
 .btn.ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); box-shadow: none; }
@@ -225,7 +226,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
   position: relative; margin-top: 56px; overflow: hidden;
   border-bottom: 1px solid var(--line);
   background:
-    radial-gradient(90% 160% at 0% 50%, rgba(216, 180, 94, .10), transparent 55%),
+    radial-gradient(90% 160% at 0% 50%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 55%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d8b45f' stroke-opacity='.07' stroke-width='2'%3E%3Ccircle cx='44' cy='80' r='9'/%3E%3Ccircle cx='76' cy='80' r='9'/%3E%3Cpath d='M50 73 80 34M70 73 40 34'/%3E%3C/g%3E%3C/svg%3E"),
     #070707;
 }
@@ -338,6 +339,7 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 .check { display: flex; align-items: center; gap: 8px; margin: 0; padding-bottom: 11px; color: var(--text); font-size: .88rem; white-space: nowrap; cursor: pointer; }
 .check input { width: 18px; height: 18px; padding: 0; accent-color: var(--gold); }
 .fila .btn.sm { padding: 11px 16px; }
+.negocio-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 14px 0 18px; }
 .dias { display: grid; gap: 8px; margin: 14px 0 18px; max-width: 520px; }
 .dia-fila { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
 .dia-fila input[type="time"] { min-width: 0; padding-left: 10px; padding-right: 8px; }

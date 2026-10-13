@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pago (demo) · Tata Barber</title>
+<title>Pago (demo) · {{nombre}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
+<style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
 </head>
 <body>
-<header class="top"><div class="wrap"><div class="brand">TATA <span>BARBER</span></div></div></header>
+<header class="top"><div class="wrap"><div class="brand">{{{marcaHtml}}}</div></div></header>
 <main class="wrap" style="max-width:480px">
   <section class="card" style="margin-top:40px">
     <div class="msg info">Pago en modo demostración — no se realiza ningún cobro real. Para cobrar de verdad, configura Mercado Pago en el archivo <code>.env</code>.</div>

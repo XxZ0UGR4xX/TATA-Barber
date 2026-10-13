@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Administrador · Tata Barber</title>
+<title>Administrador · {{nombre}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
+<style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <div class="brand">TATA <span>BARBER</span> · Admin</div>
+  <div class="brand">{{{marcaHtml}}} · Admin</div>
   <div>
     <a class="btn ghost sm" href="index.html">Ver sitio</a>
     <button class="btn ghost sm hidden" id="btn-logout">Cerrar sesión</button>
@@ -35,7 +36,7 @@
       <h1>Panel</h1>
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="citas">Citas</button>
-        <button class="tab" data-tab="config">Barberos, servicios y horario</button>
+        <button class="tab" data-tab="config">Configuración</button>
       </nav>
     </div>
 
@@ -75,6 +76,23 @@
 
     <!-- Configuración: lo que el cliente ve al reservar -->
     <div id="tab-config" class="hidden">
+      <div class="card">
+        <h2>Datos de la barbería</h2>
+        <p class="muted">Se muestran en el sitio (encabezado y pie de página) y en los correos a los clientes. Deja vacío lo que no uses.</p>
+        <div class="negocio-grid" id="cfg-negocio">
+          <div><label for="n-nombre">Nombre</label><input id="n-nombre" name="nombre" maxlength="40" /></div>
+          <div><label for="n-eslogan">Frase corta</label><input id="n-eslogan" name="eslogan" maxlength="120" /></div>
+          <div><label for="n-direccion">Dirección (calle, número, colonia, C.P.)</label><input id="n-direccion" name="direccion" maxlength="100" /></div>
+          <div><label for="n-ciudad">Ciudad y estado</label><input id="n-ciudad" name="ciudadEstado" maxlength="60" placeholder="Aguascalientes, Ags." /></div>
+          <div><label for="n-tel">Teléfono (10 dígitos)</label><input id="n-tel" name="telefono" inputmode="tel" maxlength="20" /></div>
+          <div><label for="n-wa">WhatsApp (10 dígitos)</label><input id="n-wa" name="whatsapp" inputmode="tel" maxlength="20" /></div>
+          <div><label for="n-correo">Correo de contacto</label><input id="n-correo" name="correo" type="email" maxlength="80" /></div>
+          <div><label for="n-ig">Instagram (usuario)</label><input id="n-ig" name="instagram" maxlength="80" placeholder="tatabarber" /></div>
+          <div><label for="n-fb">Facebook (usuario o página)</label><input id="n-fb" name="facebook" maxlength="80" /></div>
+          <div><label for="n-tt">TikTok (usuario)</label><input id="n-tt" name="tiktok" maxlength="80" /></div>
+        </div>
+        <button class="btn" id="save-negocio">Guardar datos</button>
+      </div>
       <div class="card">
         <h2>Barberos</h2>
         <p class="muted">Desmarca "Visible" para que un barbero ya no aparezca al reservar. Sus citas pasadas se conservan.</p>
@@ -252,7 +270,15 @@ async function cargarCatalogo() {
   $('#cfg-barberos').innerHTML = catalogo.barberos.map((b) => filaBarbero(b)).join('');
   $('#cfg-servicios').innerHTML = catalogo.servicios.map((s) => filaServicio(s)).join('');
   pintarHorario(catalogo.horario);
+  document.querySelectorAll('#cfg-negocio [name]').forEach((i) => { i.value = catalogo.negocio[i.name] || ''; });
 }
+$('#save-negocio').onclick = async () => {
+  const datos = Object.fromEntries([...document.querySelectorAll('#cfg-negocio [name]')].map((i) => [i.name, i.value]));
+  const r = await api('/api/admin/negocio', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
+  const d = await r.json().catch(() => ({}));
+  aviso(r.ok ? 'Datos guardados. Ya se ven en el sitio.' : d.error || 'No se pudo guardar', r.ok ? 'ok' : 'err');
+  if (r.ok) cargarCatalogo();
+};
 $('#add-barbero').onclick = () => { $('#cfg-barberos').insertAdjacentHTML('beforeend', filaBarbero()); $('#cfg-barberos .fila:last-child input').focus(); };
 $('#add-servicio').onclick = () => { $('#cfg-servicios').insertAdjacentHTML('beforeend', filaServicio()); $('#cfg-servicios .fila:last-child input').focus(); };
 

@@ -5,8 +5,7 @@
 //   - precio: número en pesos (ej. 1899) o null para mostrar "Pregunta por el precio".
 //   - fotos: la primera es la principal; las demás aparecen como miniaturas.
 
-// WhatsApp de la tienda para apartar productos (52 + 10 dígitos, sin espacios)
-const TIENDA_WHATSAPP = '524492249214';
+// El botón "Apartar por WhatsApp" usa el WhatsApp de la barbería (negocio.js o el panel).
 
 const PRODUCTOS = [
   {

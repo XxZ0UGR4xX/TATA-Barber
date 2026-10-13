@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS citas (
 CREATE INDEX IF NOT EXISTS idx_citas_barbero_fecha ON citas (barbero_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_citas_estado ON citas (estado);
 
+-- Datos del negocio que el dueño edita en el panel (sobrescriben a negocio.js)
+CREATE TABLE IF NOT EXISTS ajustes (
+  clave TEXT PRIMARY KEY,
+  valor TEXT NOT NULL
+);
+
 -- Horario de atención: 0 = domingo ... 6 = sábado. abre/cierra en NULL = cerrado ese día.
 CREATE TABLE IF NOT EXISTS horario (
   dia INTEGER PRIMARY KEY CHECK (dia BETWEEN 0 AND 6),

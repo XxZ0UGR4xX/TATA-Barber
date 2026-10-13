@@ -2,9 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const mail = require('./mail');
+const NEGOCIO_BASE = require('./negocio');
 
 const PORT = process.env.PORT || 3000;
 // En Render, RENDER_EXTERNAL_URL trae la URL pública (https://...onrender.com). BASE_URL solo hace falta
@@ -40,11 +42,72 @@ if (MODO_DEMO) console.log('⚠  Sin MP_ACCESS_TOKEN: el pago funciona en MODO D
 else console.log(`Mercado Pago activo (${MP_ES_PRUEBA ? 'credenciales de PRUEBA' : 'credenciales REALES'}).`);
 if (ADMIN_PASS === 'admin123') console.log('⚠  Usando contraseña de admin por defecto. Cámbiala en .env (ADMIN_PASS).');
 
+// ---------- datos del negocio ----------
+// negocio.js trae los valores de instalación; lo que el dueño guarda en el panel (tabla ajustes) los reemplaza.
+const CAMPOS_NEGOCIO = ['nombre', 'eslogan', 'direccion', 'ciudadEstado', 'telefono', 'whatsapp', 'correo', 'instagram', 'facebook', 'tiktok'];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const diezDigitos = (s) => String(s ?? '').replace(/\D/g, '').slice(-10);
+const COLOR = /^#[0-9a-f]{3,8}$/i;
+
+function negocio() {
+  const guardados = Object.fromEntries(db.prepare('SELECT clave, valor FROM ajustes').all().map((r) => [r.clave, r.valor]));
+  const n = { ...NEGOCIO_BASE };
+  CAMPOS_NEGOCIO.forEach((k) => { if (k in guardados) n[k] = guardados[k]; else n[k] = String(n[k] ?? ''); });
+  const tel = diezDigitos(n.telefono), wa = diezDigitos(n.whatsapp);
+  const [primera, ...resto] = n.nombre.trim().split(/\s+/);
+  const colores = { acento: '#d8b45f', acentoClaro: '#f1d792', acentoOscuro: '#b88a35' };
+  Object.keys(colores).forEach((k) => { if (COLOR.test(n.colores?.[k] || '')) colores[k] = n.colores[k]; });
+  return {
+    ...n, ...colores,
+    ciudad: n.ciudadEstado.split(',')[0].trim(),
+    // Encabezado: primera palabra en blanco y el resto en dorado
+    marcaHtml: resto.length ? `${esc(primera)} <span>${esc(resto.join(' '))}</span>` : `<span>${esc(primera)}</span>`,
+    telLink: tel.length === 10 ? `+52${tel}` : '',
+    waNumero: wa.length === 10 ? `52${wa}` : '',
+    waLink: wa.length === 10 ? `https://wa.me/52${wa}` : '',
+    mapa: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${n.direccion}, ${n.ciudadEstado}`),
+    instagramUrl: n.instagram ? `https://www.instagram.com/${encodeURIComponent(n.instagram)}` : '',
+    facebookUrl: n.facebook ? `https://www.facebook.com/${encodeURIComponent(n.facebook)}` : '',
+    tiktokUrl: n.tiktok ? `https://www.tiktok.com/@${encodeURIComponent(n.tiktok)}` : '',
+    hayRedes: !!(n.instagram || n.facebook || n.tiktok),
+    anio: new Date().getFullYear(),
+  };
+}
+
+// Plantillas mínimas para las páginas: {{campo}} (escapado), {{{campo}}} (HTML ya seguro) y
+// {{#campo}}…{{/campo}} (solo si el campo tiene valor).
+const secciones = (texto, datos) =>
+  texto.replace(/{{#(\w+)}}([\s\S]*?){{\/\1}}/g, (_, k, dentro) => (datos[k] ? secciones(dentro, datos) : ''));
+function plantilla(texto, datos) {
+  return secciones(texto, datos)
+    .replace(/{{{(\w+)}}}/g, (_, k) => String(datos[k] ?? ''))
+    .replace(/{{(\w+)}}/g, (_, k) => esc(datos[k]));
+}
+const PUBLIC = path.join(__dirname, 'public');
+const PAGINAS = new Map(fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))
+  .map((f) => [f, fs.readFileSync(path.join(PUBLIC, f), 'utf8')]));
+
+function datosPagina() {
+  const n = negocio();
+  // Lo que el JavaScript de las páginas necesita (sin "<" para no cerrar el <script>)
+  const json = JSON.stringify({ nombre: n.nombre, direccion: n.direccion, telLink: n.telLink, waNumero: n.waNumero })
+    .replace(/</g, '\\u003c');
+  return { ...n, negocioJson: json };
+}
+
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '20kb' }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+// Las páginas HTML se llenan con los datos del negocio; lo demás (CSS, imágenes, JS) se sirve tal cual
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const archivo = req.path === '/' ? 'index.html' : req.path.slice(1);
+  const pagina = PAGINAS.get(archivo);
+  if (!pagina) return next();
+  res.type('html').set('Cache-Control', 'no-cache').send(plantilla(pagina, datosPagina()));
+});
+app.use(express.static(PUBLIC, { index: false }));
 
 // ---------- utilidades ----------
 const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
@@ -123,11 +186,11 @@ async function marcarPagada(citaId) {
   const log = (quien) => (e) => console.error(`[correo ${quien}]`, e.message);
   if (cita && estado === 'pagada') {
     mail.avisarBarberia(cita).catch(log('barbería'));
-    mail.confirmarCliente(cita).catch(log('cliente'));
+    mail.confirmarCliente(cita, negocio()).catch(log('cliente'));
   } else if (cita && estado === 'conflicto') {
     console.warn(`[pago] Cita ${cita.codigo} pagada sin horario disponible: queda por revisar.`);
     mail.avisarConflicto(cita).catch(log('barbería'));
-    mail.conflictoCliente(cita).catch(log('cliente'));
+    mail.conflictoCliente(cita, negocio()).catch(log('cliente'));
   }
   return cita;
 }
@@ -234,7 +297,7 @@ app.post('/api/reservas', async (req, res) => {
         payer: { name: n, email: e },
         external_reference: String(citaId),
         metadata: { cita_id: citaId, codigo },
-        statement_descriptor: 'TATA BARBER',
+        statement_descriptor: negocio().nombre.toUpperCase().slice(0, 22), // lo que aparece en el estado de cuenta
         back_urls: {
           success: `${BASE_URL}/gracias.html`,
           pending: `${BASE_URL}/gracias.html`,
@@ -394,7 +457,32 @@ app.get('/api/admin/catalogo', requireAdmin, (req, res) => {
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion, activo FROM servicios ORDER BY id').all(),
     horario: horario(),
     paso: PASO,
+    negocio: Object.fromEntries(CAMPOS_NEGOCIO.map((k) => [k, negocio()[k]])),
   });
+});
+
+// Datos de contacto del negocio (los que el dueño puede cambiar)
+app.put('/api/admin/negocio', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  const red = (v) => texto(v, 80).replace(/^https?:\/\/(www\.)?[^/]+\//i, '').replace(/^@/, '').replace(/\/.*$/, '');
+  const v = {
+    nombre: texto(b.nombre, 40), eslogan: texto(b.eslogan, 120),
+    direccion: texto(b.direccion, 100), ciudadEstado: texto(b.ciudadEstado, 60),
+    telefono: texto(b.telefono, 20), whatsapp: texto(b.whatsapp, 20), correo: texto(b.correo, 80).toLowerCase(),
+    instagram: red(b.instagram), facebook: red(b.facebook), tiktok: red(b.tiktok),
+  };
+  if (v.nombre.length < 2) return res.status(400).json({ error: 'Escribe el nombre de la barbería' });
+  if (!v.direccion || !v.ciudadEstado) return res.status(400).json({ error: 'Escribe la dirección y la ciudad' });
+  for (const k of ['telefono', 'whatsapp']) {
+    if (v[k] && diezDigitos(v[k]).length !== 10) return res.status(400).json({ error: `El ${k === 'telefono' ? 'teléfono' : 'WhatsApp'} debe tener 10 dígitos` });
+  }
+  if (v.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.correo)) return res.status(400).json({ error: 'Correo inválido' });
+  for (const k of ['instagram', 'facebook', 'tiktok']) {
+    if (v[k] && !/^[\w.-]{1,50}$/.test(v[k])) return res.status(400).json({ error: `Revisa el usuario de ${k}` });
+  }
+  const up = db.prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor');
+  db.transaction(() => Object.entries(v).forEach(([k, val]) => up.run(k, val)))();
+  res.json({ ok: true });
 });
 
 app.post('/api/admin/barberos', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>

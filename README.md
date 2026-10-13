@@ -59,9 +59,9 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 
 ## 4. Personalizar barberos, servicios y horario
 
-- **Barberos, servicios, precios y horario:** se editan desde el panel de administrador, en la pestaña **"Barberos, servicios y horario"**. Los cambios se ven en el sitio al instante. La lista inicial (la primera vez que arranca) está en `db.js`. Un barbero o servicio no se borra: se marca como no visible, para conservar sus citas pasadas.
+- **Barberos, servicios, precios y horario:** se editan desde el panel de administrador, en la pestaña **"Configuración"**. Los cambios se ven en el sitio al instante. La lista inicial (la primera vez que arranca) está en `db.js`. Un barbero o servicio no se borra: se marca como no visible, para conservar sus citas pasadas.
 - El `PASO` al inicio de `server.js` controla cada cuántos minutos hay un turno (30). El horario del pie de página se actualiza solo.
-- **Pie de página (dirección, teléfono, redes, correo):** edita el bloque marcado con ✏️ al final de `public/index.html`.
+- **Datos de la barbería (nombre, dirección, teléfono, WhatsApp, correo, redes):** el dueño los cambia en el panel → **"Configuración"** → "Datos de la barbería". Los valores de instalación, los **colores** y la **imagen del encabezado** están en `negocio.js`. Para instalar el sistema a otra barbería, cambia `negocio.js` y las imágenes de `public/img/`; no hace falta tocar el HTML.
 - **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
 - **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
 
@@ -74,6 +74,7 @@ Al pagar, el horario se **aparta** por 15 minutos mientras se completa el pago, 
 ```
 server.js        API, pagos, correos, sesión del admin, lógica de horarios
 db.js            Base de datos SQLite y datos iniciales
+negocio.js       Datos de la barbería: nombre, contacto, colores, banner
 mail.js          Envío de correos (barbería + cliente)
 public/
   index.html     Reserva paso a paso (servicio → barbero → día/hora → datos → pago)
