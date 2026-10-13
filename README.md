@@ -43,6 +43,7 @@ npm start
 | `BARBERIA_EMAIL` | Correo que **recibe** el aviso de cada cita. |
 | `SMTP_*` / `MAIL_FROM` | Cuenta desde la que se **envían** los correos. |
 | `MP_ACCESS_TOKEN` | Access Token de Mercado Pago para cobrar. Vacío = modo demo. |
+| `PERMITIR_DEMO` | Solo en producción: `1` permite arrancar en modo demo (sin token). Sin esto, en Render el sitio no arranca si falta el token o la contraseña del panel (mínimo 8 caracteres). |
 
 ### Correo con Gmail
 Usa una **contraseña de aplicación** (no tu contraseña normal): activa la verificación en dos pasos y genérala en https://myaccount.google.com/apppasswords. Ponla en `SMTP_PASS`.

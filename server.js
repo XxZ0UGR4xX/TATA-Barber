@@ -38,6 +38,22 @@ if (!MODO_DEMO) {
 }
 const MP_ES_PRUEBA = MP_TOKEN.startsWith('TEST-');
 
+// En producción (Render define RENDER=true) no se arranca con un panel abierto ni con pagos simulados:
+// cualquiera podría entrar con admin123 o agendar citas "pagadas" sin pagar.
+if (process.env.RENDER || process.env.NODE_ENV === 'production') {
+  const faltan = [];
+  if (!process.env.ADMIN_PASS || ADMIN_PASS === 'admin123' || ADMIN_PASS.length < 8) {
+    faltan.push('ADMIN_PASS (contraseña del panel, mínimo 8 caracteres)');
+  }
+  if (MODO_DEMO && process.env.PERMITIR_DEMO !== '1') {
+    faltan.push('MP_ACCESS_TOKEN (o PERMITIR_DEMO=1 para probar sin cobrar)');
+  }
+  if (faltan.length) {
+    console.error(`✖ No se puede arrancar en producción. Falta configurar: ${faltan.join('; ')}.`);
+    process.exit(1);
+  }
+}
+
 if (MODO_DEMO) console.log('⚠  Sin MP_ACCESS_TOKEN: el pago funciona en MODO DEMO (simulado).');
 else console.log(`Mercado Pago activo (${MP_ES_PRUEBA ? 'credenciales de PRUEBA' : 'credenciales REALES'}).`);
 if (ADMIN_PASS === 'admin123') console.log('⚠  Usando contraseña de admin por defecto. Cámbiala en .env (ADMIN_PASS).');

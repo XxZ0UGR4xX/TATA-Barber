@@ -41,7 +41,7 @@ Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
    - `MAIL_FROM` → `Tata Barber <el-gmail@gmail.com>`
    - `MP_ACCESS_TOKEN` → tu Access Token de Mercado Pago
    - (`SESSION_SECRET` se genera solo. `BASE_URL` no hace falta: el sistema usa la URL pública de Render)
-5. Dale **Deploy**. En unos minutos tendrás una URL tipo `https://tata-barber.onrender.com`.
+5. Dale **Deploy**. Si falta `ADMIN_PASS` (mínimo 8 caracteres) o `MP_ACCESS_TOKEN`, el servicio no arranca y en **Logs** dice qué falta: es a propósito, para que el panel nunca quede con una contraseña por defecto ni se puedan agendar citas sin pagar. En unos minutos tendrás una URL tipo `https://tata-barber.onrender.com`.
 
 ## Paso 5 — Conecta el webhook de Mercado Pago (importante)
 Esto confirma el pago aunque el cliente cierre el navegador.
