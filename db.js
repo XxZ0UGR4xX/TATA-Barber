@@ -43,6 +43,14 @@ CREATE TABLE IF NOT EXISTS citas (
 CREATE INDEX IF NOT EXISTS idx_citas_barbero_fecha ON citas (barbero_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_citas_estado ON citas (estado);
 
+-- Sesiones del panel: solo la huella (SHA-256) de la llave que lleva la cookie, nunca la llave
+CREATE TABLE IF NOT EXISTS sesiones (
+  id_hash TEXT PRIMARY KEY,
+  huella TEXT NOT NULL,
+  expira INTEGER NOT NULL,
+  creada TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Datos del negocio que el dueño edita en el panel (sobrescriben a negocio.js)
 CREATE TABLE IF NOT EXISTS ajustes (
   clave TEXT PRIMARY KEY,

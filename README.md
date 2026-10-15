@@ -99,13 +99,15 @@ public/
 
 ## 7. Seguridad
 
-- **Base de datos:** todas las consultas usan parámetros (`?`); los datos del usuario nunca se pegan al SQL.
-- **Inyección de JavaScript (XSS):** todo lo que se muestra en las páginas, el panel y los correos va escapado, y la política de contenido (CSP con *nonce*) solo deja correr los scripts del propio sitio.
-- **Cabeceras:** CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y HSTS con HTTPS.
-- **Abuso de la agenda:** máximo 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; solo se reserva hasta 60 días adelante.
-- **Pagos:** cada pago se verifica con Mercado Pago (estado, monto y moneda); la página de confirmación solo muestra la cita si coincide el `preference_id`.
-- **Panel:** contraseña obligatoria en producción (mínimo 8 caracteres), 5 intentos de login cada 15 min por IP, cookie `httpOnly` + `SameSite=Strict`; cambiar `ADMIN_PASS` cierra todas las sesiones.
+- **Base de datos (inyección SQL):** todas las consultas usan parámetros (`?`); los datos del usuario nunca se pegan al SQL. Los identificadores se validan como enteros.
+- **Inyección de JavaScript (XSS):** todo lo que se muestra en las páginas, el panel y los correos va escapado; las plantillas se llenan en una sola pasada (un dato con `{{…}}` se queda como texto) y la política de contenido (CSP con *nonce* por respuesta) solo deja correr los scripts del propio sitio.
+- **Sesión del panel:** la cookie solo lleva una llave aleatoria de 256 bits, sin datos dentro; en la base se guarda únicamente su huella SHA-256. Es `HttpOnly`, `SameSite=Strict` y, con HTTPS, `Secure` con prefijo `__Host-`. Cerrar sesión la invalida en el servidor; cambiar `ADMIN_PASS` o `SESSION_SECRET` cierra todas las sesiones; máximo 5 sesiones abiertas.
+- **APIs encapsuladas:** las acciones (POST/PUT) solo se aceptan desde el propio sitio (`Origin` / `Sec-Fetch-Site`); sin CORS, otro sitio no puede leer las respuestas; los datos privados van con `Cache-Control: no-store`; la API pública solo devuelve lo necesario; rutas inexistentes responden un 404 neutro.
+- **Límites:** 300 consultas a la API cada 5 min por IP; 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; 5 intentos de login cada 15 min; reservas hasta 60 días adelante.
+- **Pagos:** cada pago se verifica con Mercado Pago (estado, monto y moneda); la confirmación solo muestra la cita si coincide su `preference_id`.
+- **Cabeceras:** CSP, HSTS (con HTTPS), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`; sin `X-Powered-By`.
 - **Errores:** nunca muestran rutas ni detalles internos del servidor.
+- **Tráfico cifrado:** en Render todo va por HTTPS. La IP de cada visitante se toma del proxy de Render (`trust proxy` = 1); si se despliega en otro lugar sin proxy, hay que ajustar ese valor.
 
 ## 8. Notas para producción
 

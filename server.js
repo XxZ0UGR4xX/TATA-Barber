@@ -95,9 +95,8 @@ function negocio() {
 const secciones = (texto, datos) =>
   texto.replace(/{{#(\w+)}}([\s\S]*?){{\/\1}}/g, (_, k, dentro) => (datos[k] ? secciones(dentro, datos) : ''));
 function plantilla(texto, datos) {
-  return secciones(texto, datos)
-    .replace(/{{{(\w+)}}}/g, (_, k) => String(datos[k] ?? ''))
-    .replace(/{{(\w+)}}/g, (_, k) => esc(datos[k]));
+  // Una sola pasada: lo que se inserta no se vuelve a leer, así un dato con "{{nonce}}" se queda como texto
+  return secciones(texto, datos).replace(/{{{(\w+)}}}|{{(\w+)}}/g, (_, crudo, k) => (crudo ? String(datos[crudo] ?? '') : esc(datos[k])));
 }
 const PUBLIC = path.join(__dirname, 'public');
 const PAGINAS = new Map(fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))
@@ -142,6 +141,28 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '20kb' }));
 app.use(cookieParser());
+
+// ---------- encapsulado de la API ----------
+// Límite general por IP (el aviso de Mercado Pago tiene el suyo) para frenar barridos y ataques de fuerza bruta
+const limiteApi = limitePorIp(300, 5 * 60 * 1000, 'Demasiadas solicitudes. Espera unos minutos.');
+const limiteWebhook = limitePorIp(600, 10 * 60 * 1000, 'Demasiados avisos');
+app.use('/api', (req, res, next) => (req.path === '/mp/webhook' ? limiteWebhook : limiteApi)(req, res, next));
+// Las acciones (POST/PUT/DELETE) solo se aceptan desde el propio sitio: el navegador manda Origin y Sec-Fetch-Site
+// y otra página no puede falsificarlos. El aviso de Mercado Pago es de servidor a servidor y no los trae.
+app.use('/api', (req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.path === '/mp/webhook') return next();
+  const sitio = req.get('sec-fetch-site');
+  const origen = req.get('origin');
+  let mismoHost = true;
+  if (origen) { try { mismoHost = new URL(origen).host === req.get('host'); } catch { mismoHost = false; } }
+  if ((sitio && !['same-origin', 'none'].includes(sitio)) || !mismoHost) {
+    return res.status(403).json({ error: 'Origen no permitido' });
+  }
+  next();
+});
+// Datos privados (citas, clientes, sesión) nunca se guardan en caché del navegador ni de proxies
+app.use(['/api/admin', '/api/reservas', '/api/demo'], (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+const idValido = (v) => (/^\d{1,9}$/.test(String(v)) ? Number(v) : null);
 // Las páginas HTML se llenan con los datos del negocio; lo demás (CSS, imágenes, JS) se sirve tal cual
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -285,7 +306,7 @@ app.post('/api/mp/webhook', async (req, res) => {
 app.get('/api/config', (req, res) => {
   const h = horario();
   res.json({
-    barberos: db.prepare('SELECT id, nombre, especialidad FROM barberos WHERE activo = 1').all(),
+    barberos: db.prepare('SELECT id, nombre FROM barberos WHERE activo = 1').all(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
     diasCerrados: Object.keys(h).filter((d) => !h[d]).map(Number),
     horario: h,
@@ -418,14 +439,15 @@ app.get('/api/reservas/confirmar', async (req, res) => {
 });
 
 // Modo demo: datos de la cita y "pago" simulado
+const CODIGO = /^[0-9A-Fa-f]{8}$/;
 app.get('/api/demo/:codigo', (req, res) => {
-  if (!MODO_DEMO) return res.sendStatus(404);
+  if (!MODO_DEMO || !CODIGO.test(req.params.codigo)) return res.status(404).json({ error: 'No encontrado' });
   const c = citaCompleta('c.codigo = ?', String(req.params.codigo).toUpperCase());
   if (!c) return res.status(404).json({ error: 'Cita no encontrada' });
   res.json(publica(c));
 });
 app.post('/api/demo/:codigo/pagar', async (req, res) => {
-  if (!MODO_DEMO) return res.sendStatus(404);
+  if (!MODO_DEMO || !CODIGO.test(req.params.codigo)) return res.status(404).json({ error: 'No encontrado' });
   const c = citaCompleta('c.codigo = ?', String(req.params.codigo).toUpperCase());
   if (!c) return res.status(404).json({ error: 'Cita no encontrada' });
   if (c.estado === 'cancelada') return res.status(409).json({ error: 'La cita fue cancelada' });
@@ -435,30 +457,41 @@ app.post('/api/demo/:codigo/pagar', async (req, res) => {
 // ---------- admin ----------
 const intentos = new Map(); // ip -> {n, hasta}
 setInterval(() => { const ahora = Date.now(); for (const [ip, r] of intentos) if (r.hasta < ahora) intentos.delete(ip); }, 15 * 60 * 1000).unref();
-// La llave de la sesión incluye la contraseña: si se cambia ADMIN_PASS, todas las sesiones abiertas dejan de valer
-const LLAVE_SESION = crypto.createHash('sha256').update(`${SESSION_SECRET}|${ADMIN_USER}|${ADMIN_PASS}`).digest();
-const firmar = (payload) => {
-  const b = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  return `${b}.${crypto.createHmac('sha256', LLAVE_SESION).update(b).digest('base64url')}`;
-};
-function verificar(token) {
-  if (typeof token !== 'string' || token.length > 500 || !token.includes('.')) return null;
-  const [b, sig] = token.split('.');
-  const esperado = crypto.createHmac('sha256', LLAVE_SESION).update(b).digest('base64url');
-  const a = Buffer.from(sig), z = Buffer.from(esperado);
-  if (a.length !== z.length || !crypto.timingSafeEqual(a, z)) return null;
-  try {
-    const p = JSON.parse(Buffer.from(b, 'base64url').toString());
-    return p.exp > Date.now() ? p : null;
-  } catch { return null; }
+// Sesiones: la cookie solo lleva una llave aleatoria de 256 bits, sin datos dentro (nada que leer ni que alterar).
+// En la base se guarda únicamente su huella SHA-256, así que ni con una copia de la base se arma una cookie válida.
+// Cerrar sesión la borra del servidor, y cambiar ADMIN_PASS (o SESSION_SECRET) invalida todas las sesiones.
+const HUELLA_ADMIN = crypto.createHash('sha256').update(`${SESSION_SECRET}|${ADMIN_USER}|${ADMIN_PASS}`).digest('hex');
+const CON_HTTPS = BASE_URL.startsWith('https');
+const COOKIE = CON_HTTPS ? '__Host-sesion' : 'sesion'; // __Host-: solo HTTPS, solo este dominio, no la pisa un subdominio
+const DURACION_SESION = 8 * 3600 * 1000;
+const OPCIONES_COOKIE = { httpOnly: true, sameSite: 'strict', secure: CON_HTTPS, path: '/' };
+const huellaDe = (llave) => crypto.createHash('sha256').update(llave).digest('hex');
+db.prepare('DELETE FROM sesiones WHERE expira < ? OR huella != ?').run(Date.now(), HUELLA_ADMIN);
+setInterval(() => db.prepare('DELETE FROM sesiones WHERE expira < ?').run(Date.now()), 3600 * 1000).unref();
+
+function abrirSesion(res) {
+  const llave = crypto.randomBytes(32).toString('base64url');
+  db.prepare('INSERT INTO sesiones (id_hash, huella, expira) VALUES (?, ?, ?)').run(huellaDe(llave), HUELLA_ADMIN, Date.now() + DURACION_SESION);
+  // Máximo 5 sesiones abiertas a la vez: se cierran las más viejas
+  db.prepare('DELETE FROM sesiones WHERE id_hash NOT IN (SELECT id_hash FROM sesiones ORDER BY expira DESC LIMIT 5)').run();
+  res.cookie(COOKIE, llave, { ...OPCIONES_COOKIE, maxAge: DURACION_SESION });
+}
+function sesionValida(req) {
+  const llave = req.cookies?.[COOKIE];
+  if (typeof llave !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(llave)) return false;
+  return !!db.prepare('SELECT 1 FROM sesiones WHERE id_hash = ? AND huella = ? AND expira > ?').get(huellaDe(llave), HUELLA_ADMIN, Date.now());
+}
+function cerrarSesion(req, res) {
+  const llave = req.cookies?.[COOKIE];
+  if (typeof llave === 'string') db.prepare('DELETE FROM sesiones WHERE id_hash = ?').run(huellaDe(llave));
+  res.clearCookie(COOKIE, OPCIONES_COOKIE);
 }
 const igual = (x, y) => {
   const a = crypto.createHash('sha256').update(String(x)).digest();
   const b = crypto.createHash('sha256').update(String(y)).digest();
   return crypto.timingSafeEqual(a, b);
 };
-const requireAdmin = (req, res, next) =>
-  verificar(req.cookies.admin_session) ? next() : res.status(401).json({ error: 'No autorizado' });
+const requireAdmin = (req, res, next) => (sesionValida(req) ? next() : res.status(401).json({ error: 'No autorizado' }));
 
 app.post('/api/admin/login', (req, res) => {
   const ip = req.ip;
@@ -471,14 +504,12 @@ app.post('/api/admin/login', (req, res) => {
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
   }
   intentos.delete(ip);
-  res.cookie('admin_session', firmar({ u: ADMIN_USER, exp: Date.now() + 8 * 3600 * 1000 }), {
-    httpOnly: true, sameSite: 'strict', secure: BASE_URL.startsWith('https'), maxAge: 8 * 3600 * 1000,
-  });
+  abrirSesion(res);
   res.json({ ok: true });
 });
 
-app.post('/api/admin/logout', (req, res) => { res.clearCookie('admin_session'); res.json({ ok: true }); });
-app.get('/api/admin/sesion', (req, res) => res.json({ activa: !!verificar(req.cookies.admin_session) }));
+app.post('/api/admin/logout', (req, res) => { cerrarSesion(req, res); res.json({ ok: true }); });
+app.get('/api/admin/sesion', (req, res) => res.json({ activa: sesionValida(req) }));
 
 app.get('/api/admin/citas', requireAdmin, (req, res) => {
   const { barbero, desde, hasta, estado } = req.query;
@@ -571,13 +602,17 @@ app.put('/api/admin/negocio', requireAdmin, (req, res) => {
 
 app.post('/api/admin/barberos', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
   ({ id: Number(db.prepare('INSERT INTO barberos (nombre, especialidad, activo) VALUES (?,?,?)').run(...v).lastInsertRowid) })));
-app.put('/api/admin/barberos/:id', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
-  ({ ok: db.prepare('UPDATE barberos SET nombre = ?, especialidad = ?, activo = ? WHERE id = ?').run(...v, Number(req.params.id)).changes === 1 })));
+app.put('/api/admin/barberos/:id', requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  responder(res, leerBarbero(req.body), (v) => ({ ok: db.prepare('UPDATE barberos SET nombre = ?, especialidad = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
+});
 
 app.post('/api/admin/servicios', requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
   ({ id: Number(db.prepare('INSERT INTO servicios (nombre, descripcion, precio, duracion, activo) VALUES (?,?,?,?,?)').run(...v).lastInsertRowid) })));
-app.put('/api/admin/servicios/:id', requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
-  ({ ok: db.prepare('UPDATE servicios SET nombre = ?, descripcion = ?, precio = ?, duracion = ?, activo = ? WHERE id = ?').run(...v, Number(req.params.id)).changes === 1 })));
+app.put('/api/admin/servicios/:id', requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  responder(res, leerServicio(req.body), (v) => ({ ok: db.prepare('UPDATE servicios SET nombre = ?, descripcion = ?, precio = ?, duracion = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
+});
 
 // Cuerpo: { dias: { "0": null, "1": ["10:00","19:00"], ... } }
 app.put('/api/admin/horario', requireAdmin, (req, res) => {
@@ -597,7 +632,8 @@ app.put('/api/admin/horario', requireAdmin, (req, res) => {
 });
 
 app.post('/api/admin/citas/:id/cancelar', requireAdmin, (req, res) => {
-  const r = db.prepare("UPDATE citas SET estado='cancelada' WHERE id = ? AND estado != 'cancelada'").run(Number(req.params.id));
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  const r = db.prepare("UPDATE citas SET estado='cancelada' WHERE id = ? AND estado != 'cancelada'").run(id);
   res.json({ ok: r.changes === 1 });
 });
 
@@ -621,6 +657,11 @@ async function enviarRecordatorios() {
 const revisarRecordatorios = () => enviarRecordatorios().catch((e) => console.error('[recordatorios]', e.message));
 setTimeout(revisarRecordatorios, 30 * 1000);
 setInterval(revisarRecordatorios, 10 * 60 * 1000);
+
+// Rutas que no existen: respuesta neutra, sin revelar con qué está hecho el servidor
+app.use('/api', (req, res) => res.status(404).json({ error: 'No encontrado' }));
+app.use((req, res) => res.status(404).type('html').send('<!doctype html><meta charset="utf-8"><title>No encontrado</title>' +
+  '<p style="font-family:sans-serif;padding:40px;text-align:center">Página no encontrada. <a href="/">Volver al inicio</a></p>'));
 
 // Errores: nunca se muestran rutas ni el stack del servidor al visitante
 app.use((err, req, res, next) => {

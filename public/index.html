@@ -330,7 +330,7 @@ function pintarHorario(horario) {
   $('#f-horario').innerHTML = grupos.map(({ v, dias }) => {
     const a = nombres[dias[0]], b = nombres[dias[dias.length - 1]];
     const etiqueta = dias.length === 1 ? a : dias.length === 2 ? `${a} y ${b}` : `${a} a ${b}`;
-    return `<li class="${v ? '' : 'cerrado'}"><span>${etiqueta}</span><b>${v || 'Cerrado'}</b></li>`;
+    return `<li class="${v ? '' : 'cerrado'}"><span>${etiqueta}</span><b>${esc(v || 'Cerrado')}</b></li>`;
   }).join('');
 }
 

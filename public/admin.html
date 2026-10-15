@@ -150,27 +150,27 @@ async function cargarResumen() {
   const d = await (await api('/api/admin/resumen')).json();
   $('#stats').innerHTML = (d.revisar ? `
     <button class="stat alerta" data-ver="conflicto" title="Pagaron pero su horario ya no estaba libre: reagenda o devuelve el pago">
-      <div class="n">${d.revisar}</div><div class="l">Por revisar</div></button>` : '') + `
-    <div class="stat"><div class="n">${d.hoy}</div><div class="l">Citas hoy</div></div>
-    <div class="stat"><div class="n">${d.proximas}</div><div class="l">Próximas</div></div>
-    <div class="stat"><div class="n">${d.pagadas}</div><div class="l">Pagadas (total)</div></div>
-    <div class="stat"><div class="n">${money(d.ingresos)}</div><div class="l">Ingresos</div></div>
-    <div class="stat"><div class="n">${d.canceladas}</div><div class="l">Canceladas</div></div>`;
+      <div class="n">${Number(d.revisar)}</div><div class="l">Por revisar</div></button>` : '') + `
+    <div class="stat"><div class="n">${Number(d.hoy)}</div><div class="l">Citas hoy</div></div>
+    <div class="stat"><div class="n">${Number(d.proximas)}</div><div class="l">Próximas</div></div>
+    <div class="stat"><div class="n">${Number(d.pagadas)}</div><div class="l">Pagadas (total)</div></div>
+    <div class="stat"><div class="n">${money(Number(d.ingresos))}</div><div class="l">Ingresos</div></div>
+    <div class="stat"><div class="n">${Number(d.canceladas)}</div><div class="l">Canceladas</div></div>`;
   const max = Math.max(1, ...d.porBarbero.map((b) => b.citas));
   $('#por-barbero').innerHTML = d.porBarbero.map((b) => `
     <div style="margin:10px 0">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <span><b>${esc(b.barbero)}</b> · ${b.citas} citas</span>
-        <span class="muted">${money(b.ingresos)}</span>
+        <span><b>${esc(b.barbero)}</b> · ${Number(b.citas)} citas</span>
+        <span class="muted">${money(Number(b.ingresos))}</span>
       </div>
-      <div class="bar"><i style="width:${(b.citas / max) * 100}%"></i></div>
+      <div class="bar"><i style="width:${(Number(b.citas) / max) * 100}%"></i></div>
     </div>`).join('') || '<p class="muted">Aún no hay citas.</p>';
 
   // Filtro de barberos (incluye los ocultos, que pueden tener citas pasadas)
   const sel = $('#f-barbero'), elegido = sel.value;
   const { barberos } = await (await api('/api/admin/catalogo')).json();
   sel.innerHTML = '<option value="">Todos</option>' +
-    barberos.map((b) => `<option value="${b.id}">${esc(b.nombre)}${b.activo ? '' : ' (oculto)'}</option>`).join('');
+    barberos.map((b) => `<option value="${Number(b.id)}">${esc(b.nombre)}${b.activo ? '' : ' (oculto)'}</option>`).join('');
   sel.value = elegido;
 }
 
@@ -189,12 +189,12 @@ async function cargarCitas() {
       <td class="muted">${esc(c.cliente_tel)}<br><small>${esc(c.cliente_email)}</small></td>
       <td>${esc(c.servicio)}</td>
       <td>${esc(c.barbero)}</td>
-      <td style="text-transform:capitalize">${fechaCorta(c.fecha)}</td>
+      <td style="text-transform:capitalize">${esc(fechaCorta(c.fecha))}</td>
       <td>${esc(c.hora)}</td>
-      <td>${money(c.precio)}</td>
-      <td><span class="badge ${c.estado}">${ESTADOS[c.estado] || esc(c.estado)}</span></td>
+      <td>${money(Number(c.precio))}</td>
+      <td><span class="badge ${ESTADOS[c.estado] ? c.estado : ''}">${ESTADOS[c.estado] || esc(c.estado)}</span></td>
       <td>${c.estado === 'pagada' || c.estado === 'conflicto'
-        ? `<button class="btn danger sm" data-cancelar="${c.id}" data-estado="${c.estado}">Cancelar</button>` : ''}</td>
+        ? `<button class="btn danger sm" data-cancelar="${Number(c.id)}" data-estado="${c.estado}">Cancelar</button>` : ''}</td>
     </tr>`).join('');
 }
 
@@ -258,9 +258,9 @@ function pintarHorario(h) {
     const v = h[d], off = v ? '' : 'disabled';
     return `<div class="dia-fila" data-dia="${d}">
       <label class="check"><input type="checkbox" name="abierto" ${v ? 'checked' : ''} /> ${nombre}</label>
-      <input type="time" name="abre" step="1800" value="${v ? v[0] : '10:00'}" ${off} aria-label="${nombre}: abre" />
+      <input type="time" name="abre" step="1800" value="${esc(v ? v[0] : '10:00')}" ${off} aria-label="${nombre}: abre" />
       <span class="muted">a</span>
-      <input type="time" name="cierra" step="1800" value="${v ? v[1] : '19:00'}" ${off} aria-label="${nombre}: cierra" />
+      <input type="time" name="cierra" step="1800" value="${esc(v ? v[1] : '19:00')}" ${off} aria-label="${nombre}: cierra" />
     </div>`;
   }).join('');
 }
