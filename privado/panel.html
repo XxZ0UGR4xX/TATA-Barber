@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
 <title>Administrador · {{nombre}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
@@ -13,7 +14,7 @@
 <header class="top"><div class="wrap">
   <div class="brand">{{{marcaHtml}}} · Admin</div>
   <div>
-    <a class="btn ghost sm" href="index.html">Ver sitio</a>
+    <a class="btn ghost sm" href="/">Ver sitio</a>
     <button class="btn ghost sm hidden" id="btn-logout">Cerrar sesión</button>
   </div>
 </div></header>
@@ -117,6 +118,7 @@
 </main>
 
 <script nonce="{{nonce}}">
+const API = '{{apiPanel}}'; // API del panel (ruta secreta, la pone el servidor)
 const $ = (s) => document.querySelector(s);
 const money = (n) => '$' + n + ' MXN';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -133,7 +135,7 @@ function mostrarPanel() { $('#login').classList.add('hidden'); $('#panel').class
 
 $('#btn-login').onclick = async () => {
   $('#login-msg').innerHTML = '';
-  const r = await fetch('/api/admin/login', {
+  const r = await fetch(API + '/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ usuario: $('#usuario').value, password: $('#password').value }),
   });
@@ -142,12 +144,12 @@ $('#btn-login').onclick = async () => {
   else $('#login-msg').innerHTML = `<div class="msg err">${esc(data.error || 'Error')}</div>`;
 };
 $('#password').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-login').click(); });
-$('#btn-logout').onclick = async () => { await fetch('/api/admin/logout', { method: 'POST' }); mostrarLogin(); };
+$('#btn-logout').onclick = async () => { await fetch(API + '/logout', { method: 'POST' }); mostrarLogin(); };
 
 async function cargarTodo() { await Promise.all([cargarResumen(), cargarCitas()]); }
 
 async function cargarResumen() {
-  const d = await (await api('/api/admin/resumen')).json();
+  const d = await (await api(API + '/resumen')).json();
   $('#stats').innerHTML = (d.revisar ? `
     <button class="stat alerta" data-ver="conflicto" title="Pagaron pero su horario ya no estaba libre: reagenda o devuelve el pago">
       <div class="n">${Number(d.revisar)}</div><div class="l">Por revisar</div></button>` : '') + `
@@ -168,7 +170,7 @@ async function cargarResumen() {
 
   // Filtro de barberos (incluye los ocultos, que pueden tener citas pasadas)
   const sel = $('#f-barbero'), elegido = sel.value;
-  const { barberos } = await (await api('/api/admin/catalogo')).json();
+  const { barberos } = await (await api(API + '/catalogo')).json();
   sel.innerHTML = '<option value="">Todos</option>' +
     barberos.map((b) => `<option value="${Number(b.id)}">${esc(b.nombre)}${b.activo ? '' : ' (oculto)'}</option>`).join('');
   sel.value = elegido;
@@ -180,7 +182,7 @@ async function cargarCitas() {
   if ($('#f-estado').value) q.set('estado', $('#f-estado').value);
   if ($('#f-desde').value) q.set('desde', $('#f-desde').value);
   if ($('#f-hasta').value) q.set('hasta', $('#f-hasta').value);
-  const { citas } = await (await api('/api/admin/citas?' + q)).json();
+  const { citas } = await (await api(API + '/citas?' + q)).json();
   if (!citas.length) { $('#tbody').innerHTML = '<tr><td colspan="10" class="muted">No hay citas con esos filtros.</td></tr>'; return; }
   $('#tbody').innerHTML = citas.map((c) => `
     <tr>
@@ -210,7 +212,7 @@ $('#tbody').onclick = async (e) => {
     ? '¿Marcar como resuelta y cancelar? Recuerda devolver el pago desde Mercado Pago si no la reagendaste.'
     : '¿Cancelar esta cita? El horario quedará libre.';
   if (!confirm(aviso)) return;
-  await api(`/api/admin/citas/${b.dataset.cancelar}/cancelar`, { method: 'POST' });
+  await api(`${API}/citas/${b.dataset.cancelar}/cancelar`, { method: 'POST' });
   cargarTodo();
 };
 
@@ -265,7 +267,7 @@ function pintarHorario(h) {
   }).join('');
 }
 async function cargarCatalogo() {
-  catalogo = await (await api('/api/admin/catalogo')).json();
+  catalogo = await (await api(API + '/catalogo')).json();
   $('#cfg-barberos').innerHTML = catalogo.barberos.map((b) => filaBarbero(b)).join('');
   $('#cfg-servicios').innerHTML = catalogo.servicios.map((s) => filaServicio(s)).join('');
   pintarHorario(catalogo.horario);
@@ -273,7 +275,7 @@ async function cargarCatalogo() {
 }
 $('#save-negocio').onclick = async () => {
   const datos = Object.fromEntries([...document.querySelectorAll('#cfg-negocio [name]')].map((i) => [i.name, i.value]));
-  const r = await api('/api/admin/negocio', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
+  const r = await api(API + '/negocio', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
   const d = await r.json().catch(() => ({}));
   aviso(r.ok ? 'Datos guardados. Ya se ven en el sitio.' : d.error || 'No se pudo guardar', r.ok ? 'ok' : 'err');
   if (r.ok) cargarCatalogo();
@@ -288,7 +290,7 @@ $('#tab-config').addEventListener('click', async (e) => {
   if (tipo === 'servicios') { campos.precio = Number(campos.precio); campos.duracion = Number(campos.duracion); }
   btn.disabled = true;
   try {
-    const r = await api(`/api/admin/${tipo}${id ? '/' + id : ''}`, {
+    const r = await api(`${API}/${tipo}${id ? '/' + id : ''}`, {
       method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(campos),
     });
     const d = await r.json().catch(() => ({}));
@@ -308,14 +310,14 @@ $('#save-horario').onclick = async () => {
     dias[f.dataset.dia] = f.querySelector('[name=abierto]').checked
       ? [f.querySelector('[name=abre]').value, f.querySelector('[name=cierra]').value] : null;
   });
-  const r = await api('/api/admin/horario', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dias }) });
+  const r = await api(API + '/horario', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dias }) });
   const d = await r.json().catch(() => ({}));
   aviso(r.ok ? 'Horario guardado. Ya se ve en el sitio.' : d.error || 'No se pudo guardar', r.ok ? 'ok' : 'err');
 };
 
 // ¿Ya hay sesión activa?
 (async () => {
-  const { activa } = await (await fetch('/api/admin/sesion')).json();
+  const { activa } = await (await fetch(API + '/sesion')).json();
   activa ? mostrarPanel() : mostrarLogin();
 })();
 </script>

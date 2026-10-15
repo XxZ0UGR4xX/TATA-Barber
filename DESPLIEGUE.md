@@ -33,6 +33,7 @@ Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
 4. En **Environment**, llena las variables:
    - `ADMIN_USER` → usuario del panel (ej. `tata`)
    - `ADMIN_PASS` → una contraseña fuerte
+   - `PANEL_RUTA` → la dirección secreta del panel, p. ej. `gestion-sc-8k2v9q4w` (12 a 64 letras, números o guiones; invéntala y no la compartas). Si la dejas vacía se genera una sola y aparece en **Logs**
    - `BARBERIA_EMAIL` → correo donde quieres recibir el aviso de cada cita
    - `SMTP_HOST` → `smtp.gmail.com`
    - `SMTP_PORT` → `587`
@@ -65,7 +66,7 @@ las tarjetas que ahí te dan (por ejemplo, Mastercard de prueba, cualquier fecha
 CVC). Cuando todo funcione, cambia el token por el de producción (`APP_USR-…`).
 
 ## Personalizar barberos, servicios y horario
-- **Barberos, servicios, precios y horario**: entra al panel (`/admin.html`) → pestaña
+- **Barberos, servicios, precios y horario**: entra al panel (`https://TU-SITIO/` + tu `PANEL_RUTA`; en **Logs** aparece la dirección completa) → pestaña
   **"Configuración"**. Ahí también se cambian el nombre, la dirección, el teléfono, el WhatsApp y las redes.
   Los cambios se ven en el sitio al instante, sin redesplegar.
 

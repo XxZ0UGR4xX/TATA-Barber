@@ -31,7 +31,7 @@ npm start
 ```
 
 - Sitio de reservas: http://localhost:3000
-- Panel de administrador: http://localhost:3000/admin.html
+- Panel de administrador: **no tiene botón en el sitio**. Su dirección es secreta y aparece en la consola al arrancar (`Panel admin (ruta privada…): http://localhost:3000/…`). Para elegirla tú, define `PANEL_RUTA` en `.env`.
 
 ## 3. Configuración (`.env`)
 
@@ -39,6 +39,7 @@ npm start
 |---|---|
 | `BASE_URL` | URL pública de tu sitio (usa `https://...` en producción). En Render no hace falta salvo con dominio propio. |
 | `ADMIN_USER` / `ADMIN_PASS` | Acceso al panel de administrador. **Cambia la contraseña.** |
+| `PANEL_RUTA` | Dirección secreta del panel (12 a 64 letras, números o guiones), p. ej. `gestion-sc-8k2v9q4w`. Si no la defines, se genera a partir de `SESSION_SECRET` y se muestra al arrancar. |
 | `SESSION_SECRET` | Texto largo y aleatorio para firmar la sesión del admin. |
 | `BARBERIA_EMAIL` | Correo que **recibe** el aviso de cada cita. |
 | `SMTP_*` / `MAIL_FROM` | Cuenta desde la que se **envían** los correos. |
@@ -85,11 +86,12 @@ server.js        API, pagos, correos, sesión del admin, lógica de horarios
 db.js            Base de datos SQLite y datos iniciales
 negocio.js       Datos de la barbería: nombre, contacto, colores, banner
 mail.js          Envío de correos (barbería + cliente)
+privado/
+  panel.html     Panel del administrador (solo se sirve en la ruta secreta)
 public/
   index.html     Reserva paso a paso (servicio → barbero → día/hora → datos → pago)
   pago-demo.html Pasarela simulada (solo en modo demo)
   gracias.html   Confirmación tras el pago
-  admin.html     Panel del administrador (citas y configuración)
   privacidad.html Aviso de privacidad
   productos.js   Productos de la tienda (ruleta)
   img/           Imagen del encabezado y fotos de productos
@@ -102,6 +104,7 @@ public/
 - **Base de datos (inyección SQL):** todas las consultas usan parámetros (`?`); los datos del usuario nunca se pegan al SQL. Los identificadores se validan como enteros.
 - **Inyección de JavaScript (XSS):** todo lo que se muestra en las páginas, el panel y los correos va escapado; las plantillas se llenan en una sola pasada (un dato con `{{…}}` se queda como texto) y la política de contenido (CSP con *nonce* por respuesta) solo deja correr los scripts del propio sitio.
 - **Sesión del panel:** la cookie solo lleva una llave aleatoria de 256 bits, sin datos dentro; en la base se guarda únicamente su huella SHA-256. Es `HttpOnly`, `SameSite=Strict` y, con HTTPS, `Secure` con prefijo `__Host-`. Cerrar sesión la invalida en el servidor; cambiar `ADMIN_PASS` o `SESSION_SECRET` cierra todas las sesiones; máximo 5 sesiones abiertas.
+- **Panel oculto:** sin botones en el sitio; vive en una ruta secreta (`PANEL_RUTA`) y su API también (`/api/<ruta>/…`). `/admin.html` y `/api/admin/…` no existen. La página del panel no se indexa en buscadores y no envía la dirección como *referer*. Es una capa extra: la protección real es la contraseña, la sesión y el límite de intentos.
 - **APIs encapsuladas:** las acciones (POST/PUT) solo se aceptan desde el propio sitio (`Origin` / `Sec-Fetch-Site`); sin CORS, otro sitio no puede leer las respuestas; los datos privados van con `Cache-Control: no-store`; la API pública solo devuelve lo necesario; rutas inexistentes responden un 404 neutro.
 - **Límites:** 300 consultas a la API cada 5 min por IP; 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; 5 intentos de login cada 15 min; reservas hasta 60 días adelante.
 - **Pagos:** cada pago se verifica con Mercado Pago (estado, monto y moneda); la confirmación solo muestra la cita si coincide su `preference_id`.

@@ -16,6 +16,19 @@ const TZ = 'America/Mexico_City';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+// Ruta secreta del panel: el sitio no tiene botones hacia él y /admin.html no existe. Su API vive bajo la misma
+// etiqueta (/api/<ruta>/...), así que /api/admin/... tampoco responde. Se elige con PANEL_RUTA; si no, se deriva
+// de SESSION_SECRET y se muestra al arrancar (en Render: pestaña Logs).
+const RUTA_PANEL = (() => {
+  const r = String(process.env.PANEL_RUTA || '').trim().replace(/^\/+|\/+$/g, '');
+  if (!r) return 'panel-' + crypto.createHash('sha256').update(`${SESSION_SECRET}|panel`).digest('hex').slice(0, 16);
+  if (!/^[A-Za-z0-9_-]{12,64}$/.test(r)) {
+    console.error('✖ PANEL_RUTA debe tener de 12 a 64 caracteres: letras, números, guiones o guiones bajos.');
+    process.exit(1);
+  }
+  return r;
+})();
+const API_PANEL = `/api/${RUTA_PANEL}`;
 const HOLD_MINUTES = 15; // tiempo que se aparta un horario mientras se paga
 
 const PASO = 30; // minutos entre horarios (las duraciones de los servicios son múltiplos de esto)
@@ -45,6 +58,7 @@ if (process.env.RENDER || process.env.NODE_ENV === 'production') {
   if (!process.env.ADMIN_PASS || ADMIN_PASS === 'admin123' || ADMIN_PASS.length < 8) {
     faltan.push('ADMIN_PASS (contraseña del panel, mínimo 8 caracteres)');
   }
+  if (!process.env.SESSION_SECRET) faltan.push('SESSION_SECRET (Render lo genera solo con el Blueprint)');
   if (MODO_DEMO && process.env.PERMITIR_DEMO !== '1') {
     faltan.push('MP_ACCESS_TOKEN (o PERMITIR_DEMO=1 para probar sin cobrar)');
   }
@@ -129,6 +143,7 @@ const politica = (nonce) => [
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.set('case sensitive routing', true); // la ruta del panel debe escribirse exacta (mayúsculas incluidas)
 app.use((req, res, next) => {
   res.set({
     'X-Content-Type-Options': 'nosniff',
@@ -161,7 +176,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 // Datos privados (citas, clientes, sesión) nunca se guardan en caché del navegador ni de proxies
-app.use(['/api/admin', '/api/reservas', '/api/demo'], (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+app.use([API_PANEL, '/api/reservas', '/api/demo'], (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 const idValido = (v) => (/^\d{1,9}$/.test(String(v)) ? Number(v) : null);
 // Las páginas HTML se llenan con los datos del negocio; lo demás (CSS, imágenes, JS) se sirve tal cual
 app.use((req, res, next) => {
@@ -172,6 +187,14 @@ app.use((req, res, next) => {
   const nonce = crypto.randomBytes(16).toString('base64');
   res.type('html').set({ 'Cache-Control': 'no-cache', 'Content-Security-Policy': politica(nonce) })
     .send(plantilla(pagina, { ...datosPagina(), nonce }));
+});
+const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'privado', 'panel.html'), 'utf8');
+app.get(`/${RUTA_PANEL}`, (req, res) => {
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.type('html').set({
+    'Cache-Control': 'no-store', 'Content-Security-Policy': politica(nonce),
+    'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', // que la ruta no aparezca en buscadores ni se filtre
+  }).send(plantilla(PANEL_HTML, { ...datosPagina(), nonce, apiPanel: API_PANEL }));
 });
 app.use(express.static(PUBLIC, { index: false }));
 
@@ -493,7 +516,7 @@ const igual = (x, y) => {
 };
 const requireAdmin = (req, res, next) => (sesionValida(req) ? next() : res.status(401).json({ error: 'No autorizado' }));
 
-app.post('/api/admin/login', (req, res) => {
+app.post(`${API_PANEL}/login`, (req, res) => {
   const ip = req.ip;
   const reg = intentos.get(ip);
   if (reg && reg.n >= 5 && reg.hasta > Date.now()) return res.status(429).json({ error: 'Demasiados intentos. Espera 15 minutos.' });
@@ -508,10 +531,10 @@ app.post('/api/admin/login', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/admin/logout', (req, res) => { cerrarSesion(req, res); res.json({ ok: true }); });
-app.get('/api/admin/sesion', (req, res) => res.json({ activa: sesionValida(req) }));
+app.post(`${API_PANEL}/logout`, (req, res) => { cerrarSesion(req, res); res.json({ ok: true }); });
+app.get(`${API_PANEL}/sesion`, (req, res) => res.json({ activa: sesionValida(req) }));
 
-app.get('/api/admin/citas', requireAdmin, (req, res) => {
+app.get(`${API_PANEL}/citas`, requireAdmin, (req, res) => {
   const { barbero, desde, hasta, estado } = req.query;
   const cond = ["c.estado != 'pendiente'"]; // las pendientes son intentos sin pagar
   const params = [];
@@ -528,7 +551,7 @@ app.get('/api/admin/citas', requireAdmin, (req, res) => {
   res.json({ citas });
 });
 
-app.get('/api/admin/resumen', requireAdmin, (req, res) => {
+app.get(`${API_PANEL}/resumen`, requireAdmin, (req, res) => {
   const hoy = ahoraMX().fecha;
   const tot = db.prepare(`SELECT
       COUNT(*) FILTER (WHERE estado='pagada') AS pagadas,
@@ -566,7 +589,7 @@ function leerServicio(s = {}) {
 }
 const responder = (res, r, ejecutar) => (r.error ? res.status(400).json({ error: r.error }) : res.json(ejecutar(r.valores)));
 
-app.get('/api/admin/catalogo', requireAdmin, (req, res) => {
+app.get(`${API_PANEL}/catalogo`, requireAdmin, (req, res) => {
   res.json({
     barberos: db.prepare('SELECT id, nombre, especialidad, activo FROM barberos ORDER BY id').all(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion, activo FROM servicios ORDER BY id').all(),
@@ -577,7 +600,7 @@ app.get('/api/admin/catalogo', requireAdmin, (req, res) => {
 });
 
 // Datos de contacto del negocio (los que el dueño puede cambiar)
-app.put('/api/admin/negocio', requireAdmin, (req, res) => {
+app.put(`${API_PANEL}/negocio`, requireAdmin, (req, res) => {
   const b = req.body || {};
   const red = (v) => texto(v, 80).replace(/^https?:\/\/(www\.)?[^/]+\//i, '').replace(/^@/, '').replace(/\/.*$/, '');
   const v = {
@@ -600,22 +623,22 @@ app.put('/api/admin/negocio', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/api/admin/barberos', requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
+app.post(`${API_PANEL}/barberos`, requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
   ({ id: Number(db.prepare('INSERT INTO barberos (nombre, especialidad, activo) VALUES (?,?,?)').run(...v).lastInsertRowid) })));
-app.put('/api/admin/barberos/:id', requireAdmin, (req, res) => {
+app.put(`${API_PANEL}/barberos/:id`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   responder(res, leerBarbero(req.body), (v) => ({ ok: db.prepare('UPDATE barberos SET nombre = ?, especialidad = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
 });
 
-app.post('/api/admin/servicios', requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
+app.post(`${API_PANEL}/servicios`, requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
   ({ id: Number(db.prepare('INSERT INTO servicios (nombre, descripcion, precio, duracion, activo) VALUES (?,?,?,?,?)').run(...v).lastInsertRowid) })));
-app.put('/api/admin/servicios/:id', requireAdmin, (req, res) => {
+app.put(`${API_PANEL}/servicios/:id`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   responder(res, leerServicio(req.body), (v) => ({ ok: db.prepare('UPDATE servicios SET nombre = ?, descripcion = ?, precio = ?, duracion = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
 });
 
 // Cuerpo: { dias: { "0": null, "1": ["10:00","19:00"], ... } }
-app.put('/api/admin/horario', requireAdmin, (req, res) => {
+app.put(`${API_PANEL}/horario`, requireAdmin, (req, res) => {
   const dias = req.body?.dias || {};
   const filas = [];
   for (let d = 0; d <= 6; d++) {
@@ -631,7 +654,7 @@ app.put('/api/admin/horario', requireAdmin, (req, res) => {
   res.json({ ok: true, horario: horario() });
 });
 
-app.post('/api/admin/citas/:id/cancelar', requireAdmin, (req, res) => {
+app.post(`${API_PANEL}/citas/:id/cancelar`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   const r = db.prepare("UPDATE citas SET estado='cancelada' WHERE id = ? AND estado != 'cancelada'").run(id);
   res.json({ ok: r.changes === 1 });
@@ -673,5 +696,5 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);
-  console.log(`Panel admin: ${BASE_URL}/admin.html`);
+  console.log(`Panel admin (ruta privada, no la compartas): ${BASE_URL}/${RUTA_PANEL}`);
 });

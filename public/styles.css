@@ -280,7 +280,6 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 }
 @media (max-width: 480px) {
   .brand { font-size: 1.25rem; }
-  .top-nav .btn { display: none; } /* el acceso de administrador sigue en el pie de página */
 }
 
 /* ---------- invitación a reservar (antes del pie) ---------- */
