@@ -89,6 +89,14 @@ Si en **Logs** aparece `¿Compartiste el calendario … con …?`, falta el paso
 "Hacer cambios en los eventos"). En tu computadora, `GOOGLE_CREDENCIALES` también puede ser la ruta al
 archivo, por ejemplo `GOOGLE_CREDENCIALES=./agenda-citas.json` (no lo subas a GitHub).
 
+## Paso 8 — Monitoreo y respaldos (para dar soporte)
+1. Crea un monitor gratuito (UptimeRobot o Better Stack) para `https://TU-DOMINIO/salud` cada 5 minutos, con
+   aviso a tu correo. `/salud` solo responde bien si el servidor y la base de datos funcionan; Render también lo
+   revisa y reinicia el sitio si deja de responder.
+2. Render copia el disco cada día (**Disks → Snapshots**). Además, en el panel → **Configuración → Respaldo**
+   puedes descargar una copia completa cuando quieras.
+3. Qué revisar cuando algo falla: **`SOPORTE.md`**.
+
 ---
 
 ## Probar antes de cobrar real

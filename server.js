@@ -3,6 +3,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const db = require('./db');
 const mail = require('./mail');
@@ -192,6 +193,17 @@ app.use((req, res, next) => {
   const nonce = crypto.randomBytes(16).toString('base64');
   res.type('html').set({ 'Cache-Control': 'no-cache', 'Content-Security-Policy': politica(nonce) })
     .send(plantilla(pagina, { ...datosPagina(), nonce }));
+});
+// Chequeo de salud (lo usan Render y el monitor externo): 200 solo si el servidor y la base de datos responden
+app.get('/salud', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[salud]', e.message);
+    res.status(503).json({ ok: false });
+  }
 });
 const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'privado', 'panel.html'), 'utf8');
 app.get(`/${RUTA_PANEL}`, (req, res) => {
@@ -690,6 +702,23 @@ app.put(`${API_PANEL}/barberos/:id/foto`, requireAdmin, recibirImagen('1mb'), (r
 app.delete(`${API_PANEL}/barberos/:id/foto`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   res.json({ ok: db.prepare('DELETE FROM fotos_barberos WHERE barbero_id = ?').run(id).changes === 1 });
+});
+
+// ---------- admin: respaldo de la base de datos ----------
+// Copia completa y consistente (citas, clientes, configuración y fotos), hecha con la base funcionando
+app.get(`${API_PANEL}/respaldo`, requireAdmin, async (req, res, next) => {
+  const tmp = path.join(os.tmpdir(), `respaldo-${crypto.randomBytes(8).toString('hex')}.db`);
+  const borrar = () => fs.rm(tmp, { force: true }, () => {});
+  try {
+    await db.backup(tmp);
+    const { fecha, min } = ahoraMX();
+    const nombre = negocio().nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'barberia';
+    res.download(tmp, `respaldo-${nombre}-${fecha}-${toHHMM(min).replace(':', '')}.db`, (err) => {
+      borrar();
+      if (err && !res.headersSent) next(err);
+    });
+  } catch (e) { borrar(); next(e); }
 });
 
 // ---------- admin: imágenes de referencia (carrusel del sitio) ----------

@@ -93,6 +93,7 @@ db.js            Base de datos SQLite y datos iniciales
 negocio.js       Datos de la barbería: nombre, contacto, colores, banner
 mail.js          Envío de correos (barbería + cliente)
 agenda.js        Agenda de Google: citas pagadas a Google Calendar (opcional)
+SOPORTE.md       Guía para dar soporte: monitoreo, respaldos y problemas comunes
 privado/
   panel.html     Panel del administrador (solo se sirve en la ruta secreta)
 public/
@@ -121,9 +122,15 @@ public/
 - **Errores:** nunca muestran rutas ni detalles internos del servidor.
 - **Tráfico cifrado:** en Render todo va por HTTPS. La IP de cada visitante se toma del proxy de Render (`trust proxy` = 1); si se despliega en otro lugar sin proxy, hay que ajustar ese valor.
 
-## 8. Notas para producción
+## 8. Soporte, monitoreo y respaldos
+
+- **`/salud`:** responde `{"ok":true}` si el servidor y la base de datos funcionan. Render lo usa para reiniciar el sitio si deja de responder (`healthCheckPath`) y sirve para un monitor externo gratuito.
+- **Respaldo:** panel → **Configuración → Respaldo → Descargar respaldo** baja una copia completa y consistente de la base (citas, clientes, configuración y fotos). Render, además, copia el disco cada día.
+- **Guía de problemas comunes:** `SOPORTE.md`.
+
+## 9. Notas para producción
 
 - Sirve el sitio por **HTTPS** (así la cookie del admin viaja segura).
 - Cambia `ADMIN_PASS` y `SESSION_SECRET`.
 - Configura el **webhook de Mercado Pago** para no depender de que el cliente regrese al sitio.
-- Haz respaldos del archivo `barberia.db`.
+- Descarga un respaldo desde el panel cada mes (ver sección 8).

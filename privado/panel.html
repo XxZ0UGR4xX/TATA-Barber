@@ -117,6 +117,11 @@
         <h2>Agenda de Google</h2>
         <div id="agenda-estado"></div>
       </div>
+      <div class="card">
+        <h2>Respaldo</h2>
+        <p class="muted">Descarga una copia completa de la base de datos: citas, clientes, barberos, servicios, horario, fotos y referencias. Guárdala en un lugar seguro, porque trae datos de tus clientes. Además, el servidor guarda una copia automática cada día.</p>
+        <button class="btn ghost sm" id="btn-respaldo">Descargar respaldo</button>
+      </div>
     </div>
 
     <!-- Referencias: imágenes de trabajos que se ven en el carrusel del sitio -->
@@ -409,6 +414,15 @@ $('#cfg-barberos').addEventListener('click', async (e) => {
 $('#cfg-barberos').addEventListener('input', (e) => {
   if (e.target.name === 'descripcion') e.target.closest('.fila').querySelector('[data-cuenta]').textContent = `${e.target.value.length}/160`;
 });
+
+// ---------- respaldo ----------
+$('#btn-respaldo').onclick = async () => {
+  // Si la sesión ya venció, el archivo descargado sería un error: primero se revisa
+  const { activa } = await (await fetch(API + '/sesion')).json().catch(() => ({}));
+  if (!activa) return mostrarLogin();
+  aviso('Preparando el respaldo… la descarga empieza en unos segundos.');
+  location.href = API + '/respaldo';
+};
 
 // ---------- referencias: imágenes del carrusel ----------
 let referencias = [];

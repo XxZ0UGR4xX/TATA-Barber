@@ -8,6 +8,7 @@ services:
     plan: starter            # $7 USD/mes, siempre encendido. Cambia a 'free' para probar (se duerme).
     buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /salud    # si deja de responder, Render reinicia el sitio solo
     autoDeploy: true
     # Disco persistente: aquí vive la base de datos de citas (no se borra en cada deploy)
     disk:
