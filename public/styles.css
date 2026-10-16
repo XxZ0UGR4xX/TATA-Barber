@@ -228,6 +228,44 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 .ref figcaption { margin-top: 8px; font-size: .88rem; color: var(--muted); }
 @media (max-width: 640px) { .ref { flex-basis: 72vw; } }
+/* Carrusel de imágenes de referencia */
+.ref-carrusel {
+  display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  border-radius: var(--radius); outline-offset: 4px;
+}
+.ref-carrusel::-webkit-scrollbar { display: none; }
+.ref-slide {
+  flex: 0 0 calc((100% - 28px) / 3); scroll-snap-align: start; position: relative; aspect-ratio: 4 / 5;
+  padding: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #000; cursor: zoom-in;
+}
+.ref-slide img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+.ref-slide:hover img, .ref-slide:focus-visible img { transform: scale(1.04); }
+.ref-slide:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ref-cap {
+  position: absolute; inset: auto 0 0 0; padding: 34px 14px 12px; text-align: left; color: #fff; font-size: .92rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .82)); overflow-wrap: anywhere;
+}
+.ref-carrusel + .ruleta-dots + .ref-track:not(:empty) { margin-top: 26px; }
+@media (max-width: 900px) { .ref-slide { flex-basis: calc((100% - 14px) / 2); } }
+@media (max-width: 560px) { .ref-slide { flex-basis: 82%; } }
+
+/* Visor de una imagen de referencia */
+.visor {
+  width: min(94vw, 980px); max-height: 92vh; padding: 0; border: 1px solid var(--gold-line); border-radius: var(--radius);
+  background: #0b0b0b; color: var(--text); overflow: visible;
+}
+.visor::backdrop { background: rgba(0, 0, 0, .86); }
+.visor figure { margin: 0; }
+.visor img { display: block; width: 100%; max-height: calc(92vh - 56px); object-fit: contain; border-radius: var(--radius) var(--radius) 0 0; background: #000; }
+.visor figcaption { padding: 12px 16px; min-height: 44px; font-size: .92rem; }
+.visor-cerrar {
+  position: absolute; top: 10px; right: 10px; z-index: 1; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--gold-line); background: rgba(0, 0, 0, .65); color: #fff; font-size: 1.5rem; line-height: 1;
+}
+.visor .visor-prev, .visor .visor-next { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0, 0, 0, .6); }
+.visor .visor-prev { left: 10px; }
+.visor .visor-next { right: 10px; }
+body:has(.visor[open]) { overflow: hidden; }
 
 /* ---------- tienda: ruleta de productos ---------- */
 .tienda { padding-top: 48px; }
@@ -431,6 +469,20 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 .quitar-foto { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: .78rem; text-decoration: underline; cursor: pointer; }
 .quitar-foto:hover { color: var(--bad); }
 .datos-barbero { display: grid; gap: 10px; }
+/* Panel: imágenes de referencia */
+.subir-ref { position: relative; margin: 6px 0 18px; cursor: pointer; }
+.ref-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.ref-item { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.ref-item img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 8px; background: #000; }
+.ref-item input { background: var(--panel); padding: 9px 10px; font-size: .88rem; }
+.ref-acciones { display: flex; align-items: center; gap: 8px; }
+.ref-acciones .quitar-foto { margin-left: auto; }
+.ref-mover {
+  width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--text);
+  font: inherit; cursor: pointer;
+}
+.ref-mover:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.ref-mover:disabled { opacity: .3; cursor: default; }
 .datos-barbero label small { float: right; color: var(--muted); font-size: .75rem; }
 .fila textarea { background: var(--panel); }
 .fila.servicio { grid-template-columns: 1.1fr 1.7fr 100px 110px auto auto; }

@@ -46,3 +46,8 @@ services:
         sync: false
       - key: MP_ACCESS_TOKEN
         sync: false
+      # Opcional: agenda de Google (ver DESPLIEGUE.md, Paso 7)
+      - key: GOOGLE_CALENDAR_ID
+        sync: false
+      - key: GOOGLE_CREDENCIALES   # contenido completo del JSON de la cuenta de servicio
+        sync: false

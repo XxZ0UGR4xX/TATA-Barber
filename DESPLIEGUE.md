@@ -3,10 +3,11 @@
 Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
 
 ## Resumen de costos
-- **Hosting (Render Starter):** ~$7 USD/mes (~$130 MXN). Siempre encendido.
-- **Dominio** (ej. `tatabarber.com`): ~$10–15 USD/año. Opcional al inicio.
+- **Hosting (Render Starter + disco de 1 GB):** US$7.25/mes (~$125–145 MXN según el dólar y tu banco). Siempre encendido.
+- **Dominio** (ej. `tatabarber.com`): ~$150–300 MXN el primer año; ~$300–550 al renovar. Opcional al inicio.
 - **Correos:** gratis con Gmail (contraseña de aplicación).
-- **Mercado Pago:** sin mensualidad. Comisión ~3.5–4% + IVA por pago (varía según el plazo en que recibes el dinero; lo eliges en tu panel de Mercado Pago).
+- **Agenda de Google (Google Calendar):** gratis.
+- **Mercado Pago:** sin mensualidad. Comisión de 3.49% (al instante) a 2.95% (a 30 días) + IVA por pago, y puede sumarse un cargo fijo de $4 + IVA; lo eliges y lo ves en tu cuenta de Mercado Pago.
 
 ---
 
@@ -57,6 +58,37 @@ Esto confirma el pago aunque el cliente cierre el navegador.
 3. En Render → **Environment**, agrega la variable `BASE_URL` con `https://tatabarber.com` y guarda (se redespliega solo).
 4. En Mercado Pago, cambia la URL del webhook a `https://tatabarber.com/api/mp/webhook`.
 
+## Paso 7 — (Opcional) Agenda de Google: las citas en Google Calendar
+Con esto, cada cita pagada aparece sola en el Google Calendar de la barbería (con un color por barbero, el
+teléfono del cliente y el código) y se quita si la cancelas en el panel. Es gratis. Sin este paso, cada correo
+de cita nueva trae un botón **"Agregar a Google Calendar"** para agregarla con un clic.
+
+1. Con el Gmail de la barbería entra a https://console.cloud.google.com y crea un proyecto
+   (por ejemplo "Agenda barbería"). No pide tarjeta.
+2. Menú → **APIs y servicios → Biblioteca** → busca **Google Calendar API** → **Habilitar**.
+3. Menú → **IAM y administración → Cuentas de servicio** → **Crear cuenta de servicio** → nombre `agenda-citas`
+   → **Listo** (no necesita roles).
+4. Abre esa cuenta → pestaña **Claves** → **Agregar clave → Crear clave nueva → JSON**. Se descarga un archivo
+   `.json`: es una llave, guárdalo y no lo compartas.
+5. Copia el correo de la cuenta de servicio (termina en `@….iam.gserviceaccount.com`).
+6. En https://calendar.google.com (con el Gmail de la barbería) → ⚙ **Configuración** → en
+   **Configuración de mis calendarios** elige el calendario → **Compartir con determinadas personas** →
+   **Agregar personas** → pega ese correo → permiso **"Hacer cambios en los eventos"** → **Enviar**.
+   - Recomendado: crea un calendario aparte llamado "Citas" (**Otros calendarios → + → Crear calendario**),
+     compártelo así y usa su **ID de calendario** (en su configuración, sección **Integrar el calendario**).
+     Así las citas no se mezclan con lo personal.
+7. En Render → **Environment** agrega:
+   - `GOOGLE_CALENDAR_ID` → el Gmail de la barbería (o el ID del calendario "Citas").
+   - `GOOGLE_CREDENCIALES` → abre el `.json` con el Bloc de notas, copia **todo** y pégalo como valor.
+   Guarda (se redespliega solo). En **Logs** debe decir `Agenda de Google activa → …` y en el panel,
+   **Configuración → Agenda de Google: Conectada**.
+8. Haz una reserva de prueba: aparece en el calendario en segundos. En el celular, instala Google Calendar con
+   la misma cuenta y activa las notificaciones.
+
+Si en **Logs** aparece `¿Compartiste el calendario … con …?`, falta el paso 6 (o el permiso no es
+"Hacer cambios en los eventos"). En tu computadora, `GOOGLE_CREDENCIALES` también puede ser la ruta al
+archivo, por ejemplo `GOOGLE_CREDENCIALES=./agenda-citas.json` (no lo subas a GitHub).
+
 ---
 
 ## Probar antes de cobrar real
@@ -69,6 +101,9 @@ CVC). Cuando todo funcione, cambia el token por el de producción (`APP_USR-…`
 - **Barberos, servicios, precios y horario**: entra al panel (`https://TU-SITIO/` + tu `PANEL_RUTA`; en **Logs** aparece la dirección completa) → pestaña
   **"Configuración"**. Ahí también se cambian el nombre, la dirección, el teléfono, el WhatsApp y las redes.
   Los cambios se ven en el sitio al instante, sin redesplegar.
+- **Imágenes de referencia (carrusel)**: panel → pestaña **"Referencias"** → **Subir imágenes** (puedes elegir
+  varias a la vez). Se acomodan con las flechas y cada una puede llevar un texto corto. Las fotos verticales
+  son las que mejor se ven.
 
 ## Alternativa: Railway (con Docker)
 El proyecto incluye `Dockerfile`. En https://railway.app → New Project → Deploy from repo.

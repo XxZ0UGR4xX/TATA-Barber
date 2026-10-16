@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const agenda = require('./agenda');
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -46,6 +47,11 @@ function tablaHtml(cita) {
     .join('')}</table>`;
 }
 
+// Botón "Agregar a Google Calendar" (solo abre Google Calendar con la cita ya llena)
+const botonAgenda = (url, texto) => `<p style="margin:20px 0"><a href="${esc(url)}" style="display:inline-block;background:#d8b45f;color:#111;` +
+  `text-decoration:none;font-family:Arial,sans-serif;font-weight:bold;font-size:14px;padding:11px 18px;border-radius:6px">${esc(texto)}</a></p>`;
+const lugar = (n) => (n ? `${n.nombre}, ${n.direccion}, ${n.ciudadEstado}` : '');
+
 // Pie de los correos al cliente: dónde y cómo contactar a la barbería
 function pie(n) {
   if (!n) return { text: '', html: '' };
@@ -67,26 +73,37 @@ async function enviar(opts) {
   return { enviado: true };
 }
 
-// Correo a la barbería: nueva cita pagada
-async function avisarBarberia(cita) {
+// Correo a la barbería: nueva cita pagada. Con la agenda de Google conectada la cita ya aparece sola;
+// si no, el correo trae el botón para agregarla con un clic.
+async function avisarBarberia(cita, n) {
   const to = process.env.BARBERIA_EMAIL;
   if (!to) return console.log('[correo] BARBERIA_EMAIL no definido');
+  const url = agenda.enlace(cita, `${cita.barbero_nombre} · ${cita.servicio_nombre} — ${cita.cliente_nombre}`,
+    `Tel. ${cita.cliente_tel} · ${cita.cliente_email}\nPagado: $${cita.precio} MXN · Código ${cita.codigo}`, lugar(n));
+  const conAgenda = agenda.activa();
   await enviar({
     to,
     subject: `Nueva cita: ${cita.cliente_nombre} · ${cita.fecha} ${cita.hora} · ${cita.barbero_nombre}`,
-    text: filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n'),
-    html: `<h2 style="font-family:Arial,sans-serif">Nueva cita pagada</h2>${tablaHtml(cita)}`,
+    text: filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') +
+      (conAgenda ? '\n\nSe agrega sola a tu agenda de Google.' : `\n\nAgregar a Google Calendar: ${url}`),
+    html: `<h2 style="font-family:Arial,sans-serif">Nueva cita pagada</h2>${tablaHtml(cita)}` +
+      (conAgenda ? '<p style="font-family:Arial,sans-serif;color:#666">Se agrega sola a tu agenda de Google.</p>'
+        : botonAgenda(url, 'Agregar a Google Calendar')),
   });
 }
 
 // Correo de confirmación al cliente (n = datos del negocio para el pie)
 async function confirmarCliente(cita, n) {
   const p = pie(n);
+  const url = agenda.enlace(cita, `${cita.servicio_nombre}${n ? ' en ' + n.nombre : ''}`,
+    `Con ${cita.barbero_nombre}. Código de tu cita: ${cita.codigo}.${n?.telefono ? ' Tel. ' + n.telefono : ''}`, lugar(n));
   await enviar({
     to: cita.cliente_email,
     subject: `Tu cita está confirmada · ${fechaLarga(cita.fecha)} ${cita.hora}`,
-    text: `Hola ${cita.cliente_nombre}, tu cita quedó confirmada.\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') + p.text,
+    text: `Hola ${cita.cliente_nombre}, tu cita quedó confirmada.\n\n` + filas(cita).map(([k, v]) => `${k}: ${v}`).join('\n') +
+      `\n\nAgrégala a tu Google Calendar: ${url}` + p.text,
     html: `<h2 style="font-family:Arial,sans-serif">¡Tu cita está confirmada, ${esc(cita.cliente_nombre)}!</h2>${tablaHtml(cita)}
+           ${botonAgenda(url, 'Agregar a mi Google Calendar')}
            <p style="font-family:Arial,sans-serif;color:#666">Te esperamos. Llega 5 minutos antes.</p>${p.html}`,
   });
 }

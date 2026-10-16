@@ -38,6 +38,7 @@
       <nav class="tabs" id="tabs">
         <button class="tab on" data-tab="citas">Citas</button>
         <button class="tab" data-tab="config">Configuración</button>
+        <button class="tab" data-tab="referencias">Referencias</button>
       </nav>
     </div>
 
@@ -111,6 +112,20 @@
         <p class="muted">Los turnos se ofrecen cada 30 minutos dentro de este horario.</p>
         <div class="dias" id="cfg-horario"></div>
         <button class="btn" id="save-horario">Guardar horario</button>
+      </div>
+      <div class="card">
+        <h2>Agenda de Google</h2>
+        <div id="agenda-estado"></div>
+      </div>
+    </div>
+
+    <!-- Referencias: imágenes de trabajos que se ven en el carrusel del sitio -->
+    <div id="tab-referencias" class="hidden">
+      <div class="card">
+        <h2>Imágenes de referencia <small id="ref-cuenta"></small></h2>
+        <p class="muted">Fotos de cortes, barbas y diseños hechos en la barbería. En el sitio se ven en un carrusel, en este orden; acomódalas con las flechas. Se reducen solas para que carguen rápido.</p>
+        <label class="btn subir subir-ref"><span>+ Subir imágenes</span><input type="file" accept="image/*" multiple id="ref-archivos" /></label>
+        <div class="ref-grid" id="ref-grid"></div>
       </div>
     </div>
   </section>
@@ -220,9 +235,8 @@ $('#tbody').onclick = async (e) => {
 $('#tabs').onclick = (e) => {
   const t = e.target.closest('[data-tab]'); if (!t) return;
   document.querySelectorAll('#tabs .tab').forEach((x) => x.classList.toggle('on', x === t));
-  $('#tab-citas').classList.toggle('hidden', t.dataset.tab !== 'citas');
-  $('#tab-config').classList.toggle('hidden', t.dataset.tab !== 'config');
-  t.dataset.tab === 'config' ? cargarCatalogo() : cargarTodo();
+  ['citas', 'config', 'referencias'].forEach((n) => $(`#tab-${n}`).classList.toggle('hidden', t.dataset.tab !== n));
+  ({ citas: cargarTodo, config: cargarCatalogo, referencias: cargarReferencias })[t.dataset.tab]();
 };
 
 // ---------- configuración: barberos, servicios y horario ----------
@@ -283,6 +297,11 @@ async function cargarCatalogo() {
   $('#cfg-servicios').innerHTML = catalogo.servicios.map((s) => filaServicio(s)).join('');
   pintarHorario(catalogo.horario);
   document.querySelectorAll('#cfg-negocio [name]').forEach((i) => { i.value = catalogo.negocio[i.name] || ''; });
+  const ag = catalogo.agenda || {};
+  $('#agenda-estado').innerHTML = ag.activa
+    ? `<p><span class="badge pagada">Conectada</span> Cada cita pagada se agrega sola al calendario <b>${esc(ag.calendario)}</b>, con un color por barbero. Si cancelas una cita aquí, también se quita de la agenda.</p>`
+    : `<p><span class="badge conflicto">No conectada</span> Las citas no se agregan solas a Google Calendar. Mientras tanto, cada correo de cita nueva trae el botón <b>"Agregar a Google Calendar"</b>.</p>
+       <p class="muted">Para conectarla hay que configurar GOOGLE_CALENDAR_ID y GOOGLE_CREDENCIALES en el servidor (ver DESPLIEGUE.md).</p>`;
 }
 $('#save-negocio').onclick = async () => {
   const datos = Object.fromEntries([...document.querySelectorAll('#cfg-negocio [name]')].map((i) => [i.name, i.value]));
@@ -322,25 +341,34 @@ $('#tab-config').addEventListener('click', async (e) => {
 // La foto se recorta en cuadro y se reduce a 600×600 aquí mismo, antes de subirla: pesa poco y, al volver a
 // dibujarla, se le quitan los datos ocultos del archivo (como la ubicación GPS de la cámara).
 const fotosPendientes = new WeakMap(); // barbero nuevo: la foto se sube al dar "Agregar"
-async function prepararFoto(archivo) {
+// cuadrada: recorte en cuadro (foto de barbero); si no, se conserva la proporción. max: lado mayor en píxeles.
+async function prepararImagen(archivo, { cuadrada = false, max = 600, min = 150, calidad = 0.85, vista = false } = {}) {
   if (!/^image\//.test(archivo.type)) throw new Error('Elige una imagen (JPG, PNG o WebP).');
   if (archivo.size > 25 * 1024 * 1024) throw new Error('La imagen pesa demasiado (máximo 25 MB).');
   let img;
   try { img = await createImageBitmap(archivo); } catch { throw new Error('No se pudo leer la imagen. Prueba con una foto JPG o PNG.'); }
   const lado = Math.min(img.width, img.height);
-  if (lado < 150) throw new Error('La foto es muy pequeña (mínimo 150 × 150 píxeles).');
-  const L = Math.min(600, lado);
-  const x = (img.width - lado) / 2, y = img.height > img.width ? (img.height - lado) * 0.2 : 0; // vertical: la cara suele ir arriba
-  const c = document.createElement('canvas'); c.width = c.height = L;
+  if (lado < min) { img.close?.(); throw new Error(`La imagen es muy pequeña (mínimo ${min} × ${min} píxeles).`); }
+  let sx = 0, sy = 0, sw = img.width, sh = img.height, w, h;
+  if (cuadrada) {
+    sw = sh = lado; sx = (img.width - lado) / 2;
+    sy = img.height > img.width ? (img.height - lado) * 0.2 : 0; // vertical: la cara suele ir arriba
+    w = h = Math.min(max, lado);
+  } else {
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    w = Math.round(img.width * k); h = Math.round(img.height * k);
+  }
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, x, y, lado, lado, 0, 0, L, L);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
   img.close?.();
-  const comoBlob = (tipo) => new Promise((ok) => c.toBlob(ok, tipo, 0.85));
+  const comoBlob = (tipo) => new Promise((ok) => c.toBlob(ok, tipo, calidad));
   let blob = await comoBlob('image/webp');
   if (!blob || blob.type !== 'image/webp') blob = await comoBlob('image/jpeg'); // Safari no genera WebP
   if (!blob) throw new Error('No se pudo procesar la imagen.');
-  return { blob, vista: c.toDataURL('image/jpeg', 0.8) };
+  return { blob, vista: vista ? c.toDataURL('image/jpeg', 0.8) : null };
 }
+const prepararFoto = (archivo) => prepararImagen(archivo, { cuadrada: true, vista: true });
 async function subirFoto(id, blob) {
   const r = await api(`${API}/barberos/${Number(id)}/foto`, { method: 'PUT', headers: { 'Content-Type': blob.type }, body: blob });
   const d = await r.json().catch(() => ({}));
@@ -380,6 +408,77 @@ $('#cfg-barberos').addEventListener('click', async (e) => {
 });
 $('#cfg-barberos').addEventListener('input', (e) => {
   if (e.target.name === 'descripcion') e.target.closest('.fila').querySelector('[data-cuenta]').textContent = `${e.target.value.length}/160`;
+});
+
+// ---------- referencias: imágenes del carrusel ----------
+let referencias = [];
+async function cargarReferencias() {
+  const d = await (await api(API + '/referencias')).json();
+  referencias = d.referencias;
+  $('#ref-cuenta').textContent = `${referencias.length} de ${d.max}`;
+  $('#ref-grid').innerHTML = referencias.length ? referencias.map((r, i) => `
+    <div class="ref-item" data-id="${Number(r.id)}">
+      <img src="${esc(r.foto)}" alt="" loading="lazy" />
+      <input name="titulo" maxlength="80" value="${esc(r.titulo)}" placeholder="Texto (opcional): Fade con diseño" aria-label="Texto de la imagen ${i + 1}" />
+      <div class="ref-acciones">
+        <button type="button" class="ref-mover" data-mover="-1" aria-label="Mover antes" ${i === 0 ? 'disabled' : ''}>←</button>
+        <span class="muted">${i + 1}</span>
+        <button type="button" class="ref-mover" data-mover="1" aria-label="Mover después" ${i === referencias.length - 1 ? 'disabled' : ''}>→</button>
+        <button type="button" class="quitar-foto" data-borrar>Eliminar</button>
+      </div>
+    </div>`).join('') : '<p class="muted">Aún no hay imágenes. En el sitio, la sección de referencias aparece en cuanto subas la primera.</p>';
+}
+$('#ref-archivos').addEventListener('change', async (e) => {
+  const archivos = [...e.target.files]; e.target.value = '';
+  if (!archivos.length) return;
+  const etiqueta = $('.subir-ref'); etiqueta.classList.add('cargando');
+  let subidas = 0; const errores = [];
+  try {
+    for (const [i, archivo] of archivos.entries()) {
+      aviso(`Subiendo ${i + 1} de ${archivos.length}…`);
+      try {
+        const { blob } = await prepararImagen(archivo, { max: 1600, min: 300, calidad: 0.82 });
+        const r = await api(API + '/referencias', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'No se pudo subir');
+        subidas++;
+      } catch (err) {
+        if (err.message === 'no-auth') throw err;
+        errores.push(`${archivo.name}: ${err.message}`);
+        if (/Máximo/.test(err.message)) break;
+      }
+    }
+    await cargarReferencias();
+    if (errores.length) aviso(`${subidas ? `${subidas} subida${subidas > 1 ? 's' : ''}. ` : ''}${errores[0]}${errores.length > 1 ? ` (y ${errores.length - 1} más)` : ''}`, 'err');
+    else aviso(`${subidas === 1 ? 'Imagen subida' : `${subidas} imágenes subidas`}. Ya se ven en el sitio.`);
+  } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
+  finally { etiqueta.classList.remove('cargando'); }
+});
+$('#ref-grid').addEventListener('change', async (e) => {
+  if (e.target.name !== 'titulo') return;
+  const id = e.target.closest('.ref-item').dataset.id;
+  try {
+    const r = await api(`${API}/referencias/${Number(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ titulo: e.target.value }) });
+    aviso(r.ok ? 'Texto guardado.' : 'No se pudo guardar', r.ok ? 'ok' : 'err');
+  } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
+});
+$('#ref-grid').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-mover], [data-borrar]'); if (!btn) return;
+  const id = Number(btn.closest('.ref-item').dataset.id);
+  try {
+    if (btn.matches('[data-borrar]')) {
+      if (!confirm('¿Eliminar esta imagen del sitio?')) return;
+      const r = await api(`${API}/referencias/${id}`, { method: 'DELETE' });
+      aviso(r.ok ? 'Imagen eliminada.' : 'No se pudo eliminar', r.ok ? 'ok' : 'err');
+    } else {
+      const ids = referencias.map((r) => r.id), i = ids.indexOf(id), j = i + Number(btn.dataset.mover);
+      if (j < 0 || j >= ids.length) return;
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      const r = await api(API + '/referencias/orden', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+      if (!r.ok) aviso('No se pudo mover', 'err');
+    }
+    await cargarReferencias();
+  } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
 });
 
 $('#cfg-horario').addEventListener('change', (e) => {

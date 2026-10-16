@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const mail = require('./mail');
+const agenda = require('./agenda');
 const NEGOCIO_BASE = require('./negocio');
 
 const PORT = process.env.PORT || 3000;
@@ -200,10 +201,11 @@ app.get(`/${RUTA_PANEL}`, (req, res) => {
     'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', // que la ruta no aparezca en buscadores ni se filtre
   }).send(plantilla(PANEL_HTML, { ...datosPagina(), nonce, apiPanel: API_PANEL }));
 });
-// Fotos de barberos: se entregan solo como imagen (con sandbox), así que aunque un archivo trajera código no se ejecuta
-app.get('/fotos/barberos/:id', (req, res, next) => {
+// Fotos de barberos e imágenes de referencia: se entregan solo como imagen (con sandbox), así que aunque un
+// archivo trajera código no se ejecuta
+const servirImagen = (sql) => (req, res, next) => {
   const id = idValido(req.params.id);
-  const f = id && db.prepare('SELECT tipo, datos, version FROM fotos_barberos WHERE barbero_id = ?').get(id);
+  const f = id && db.prepare(sql).get(id);
   if (!f) return next();
   res.set({
     'Content-Type': f.tipo,
@@ -211,7 +213,9 @@ app.get('/fotos/barberos/:id', (req, res, next) => {
     'Content-Security-Policy': "default-src 'none'; sandbox",
     'Cross-Origin-Resource-Policy': 'same-origin',
   }).send(f.datos);
-});
+};
+app.get('/fotos/barberos/:id', servirImagen('SELECT tipo, datos, version FROM fotos_barberos WHERE barbero_id = ?'));
+app.get('/fotos/referencias/:id', servirImagen('SELECT tipo, datos, version FROM referencias WHERE id = ?'));
 app.use(express.static(PUBLIC, { index: false }));
 
 // ---------- utilidades ----------
@@ -293,8 +297,9 @@ async function marcarPagada(citaId) {
   const cita = citaCompleta('c.id = ?', citaId);
   const log = (quien) => (e) => console.error(`[correo ${quien}]`, e.message);
   if (cita && estado === 'pagada') {
-    mail.avisarBarberia(cita).catch(log('barbería'));
+    mail.avisarBarberia(cita, negocio()).catch(log('barbería'));
     mail.confirmarCliente(cita, negocio()).catch(log('cliente'));
+    sincronizarAgenda();
   } else if (cita && estado === 'conflicto') {
     console.warn(`[pago] Cita ${cita.codigo} pagada sin horario disponible: queda por revisar.`);
     mail.avisarConflicto(cita).catch(log('barbería'));
@@ -346,6 +351,8 @@ const SQL_BARBEROS = `SELECT b.id, b.nombre, b.descripcion, b.activo, f.version
   FROM barberos b LEFT JOIN fotos_barberos f ON f.barbero_id = b.id`;
 const urlFoto = (id, version) => (version ? `/fotos/barberos/${id}?v=${version}` : null);
 const conFoto = ({ version, ...b }) => ({ ...b, foto: urlFoto(b.id, version) });
+const SQL_REFERENCIAS = "SELECT id, titulo, '/fotos/referencias/' || id || '?v=' || version AS foto FROM referencias ORDER BY orden, id";
+const MAX_REFERENCIAS = 30;
 // Solo JPG, PNG y WebP, reconocidos por sus primeros bytes (no por lo que diga quien sube el archivo)
 function tipoImagen(buf) {
   if (buf.length < 16) return null;
@@ -354,12 +361,21 @@ function tipoImagen(buf) {
   if (buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
   return null;
 }
+// Imagen subida desde el panel (cuerpo crudo): { tipo, version } o { error, status }
+const recibirImagen = (limite) => express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: limite });
+function leerImagen(req) {
+  if (!Buffer.isBuffer(req.body)) return { status: 415, error: 'Sube una imagen JPG, PNG o WebP' };
+  const tipo = tipoImagen(req.body);
+  if (!tipo) return { status: 400, error: 'El archivo no es una imagen JPG, PNG o WebP' };
+  return { tipo, version: crypto.createHash('sha256').update(req.body).digest('hex').slice(0, 12) };
+}
 
 // ---------- API pública ----------
 app.get('/api/config', (req, res) => {
   const h = horario();
   res.json({
     barberos: db.prepare(`${SQL_BARBEROS} WHERE b.activo = 1 ORDER BY b.id`).all().map(conFoto).map(({ activo, ...b }) => b),
+    referencias: db.prepare(SQL_REFERENCIAS).all(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
     diasCerrados: Object.keys(h).filter((d) => !h[d]).map(Number),
     horario: h,
@@ -626,6 +642,7 @@ app.get(`${API_PANEL}/catalogo`, requireAdmin, (req, res) => {
     horario: horario(),
     paso: PASO,
     negocio: Object.fromEntries(CAMPOS_NEGOCIO.map((k) => [k, negocio()[k]])),
+    agenda: agenda.estado(),
   });
 });
 
@@ -660,22 +677,56 @@ app.put(`${API_PANEL}/barberos/:id`, requireAdmin, (req, res) => {
   responder(res, leerBarbero(req.body), (v) => ({ ok: db.prepare('UPDATE barberos SET nombre = ?, descripcion = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
 });
 // Foto del barbero: el panel la recorta y reduce a 600×600 (≈60 KB, sin datos de ubicación) antes de subirla
-app.put(`${API_PANEL}/barberos/:id/foto`, requireAdmin,
-  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '1mb' }), (req, res) => {
-    const id = idValido(req.params.id);
-    if (!id || !db.prepare('SELECT 1 FROM barberos WHERE id = ?').get(id)) return res.status(404).json({ error: 'No encontrado' });
-    if (!Buffer.isBuffer(req.body)) return res.status(415).json({ error: 'Sube una imagen JPG, PNG o WebP' });
-    const tipo = tipoImagen(req.body);
-    if (!tipo) return res.status(400).json({ error: 'El archivo no es una imagen JPG, PNG o WebP' });
-    const version = crypto.createHash('sha256').update(req.body).digest('hex').slice(0, 12);
-    db.prepare(`INSERT INTO fotos_barberos (barbero_id, tipo, datos, version) VALUES (?,?,?,?)
-      ON CONFLICT(barbero_id) DO UPDATE SET tipo = excluded.tipo, datos = excluded.datos, version = excluded.version`)
-      .run(id, tipo, req.body, version);
-    res.json({ ok: true, foto: urlFoto(id, version) });
-  });
+app.put(`${API_PANEL}/barberos/:id/foto`, requireAdmin, recibirImagen('1mb'), (req, res) => {
+  const id = idValido(req.params.id);
+  if (!id || !db.prepare('SELECT 1 FROM barberos WHERE id = ?').get(id)) return res.status(404).json({ error: 'No encontrado' });
+  const img = leerImagen(req);
+  if (img.error) return res.status(img.status).json({ error: img.error });
+  db.prepare(`INSERT INTO fotos_barberos (barbero_id, tipo, datos, version) VALUES (?,?,?,?)
+    ON CONFLICT(barbero_id) DO UPDATE SET tipo = excluded.tipo, datos = excluded.datos, version = excluded.version`)
+    .run(id, img.tipo, req.body, img.version);
+  res.json({ ok: true, foto: urlFoto(id, img.version) });
+});
 app.delete(`${API_PANEL}/barberos/:id/foto`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   res.json({ ok: db.prepare('DELETE FROM fotos_barberos WHERE barbero_id = ?').run(id).changes === 1 });
+});
+
+// ---------- admin: imágenes de referencia (carrusel del sitio) ----------
+// El panel las reduce a máximo 1600 px y les quita los datos ocultos antes de subirlas (≈150–300 KB)
+app.get(`${API_PANEL}/referencias`, requireAdmin, (req, res) => {
+  res.json({ referencias: db.prepare(SQL_REFERENCIAS).all(), max: MAX_REFERENCIAS });
+});
+app.post(`${API_PANEL}/referencias`, requireAdmin, recibirImagen('2mb'), (req, res) => {
+  if (db.prepare('SELECT COUNT(*) AS n FROM referencias').get().n >= MAX_REFERENCIAS) {
+    return res.status(409).json({ error: `Máximo ${MAX_REFERENCIAS} imágenes. Borra alguna para subir otra.` });
+  }
+  const img = leerImagen(req);
+  if (img.error) return res.status(img.status).json({ error: img.error });
+  const orden = db.prepare('SELECT COALESCE(MAX(orden), 0) + 1 AS o FROM referencias').get().o;
+  const titulo = texto(String(req.query.titulo ?? '').replace(/\s+/g, ' '), 80);
+  const id = Number(db.prepare('INSERT INTO referencias (titulo, tipo, datos, version, orden) VALUES (?,?,?,?,?)')
+    .run(titulo, img.tipo, req.body, img.version, orden).lastInsertRowid);
+  res.json({ ok: true, id });
+});
+app.put(`${API_PANEL}/referencias/orden`, requireAdmin, (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(idValido) : [];
+  const actuales = db.prepare('SELECT id FROM referencias').all().map((r) => r.id);
+  if (ids.length !== actuales.length || ids.some((id) => !actuales.includes(id)) || new Set(ids).size !== ids.length) {
+    return res.status(400).json({ error: 'Orden inválido' });
+  }
+  const upd = db.prepare('UPDATE referencias SET orden = ? WHERE id = ?');
+  db.transaction(() => ids.forEach((id, i) => upd.run(i + 1, id)))();
+  res.json({ ok: true });
+});
+app.put(`${API_PANEL}/referencias/:id`, requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  const titulo = texto(String(req.body?.titulo ?? '').replace(/\s+/g, ' '), 80);
+  res.json({ ok: db.prepare('UPDATE referencias SET titulo = ? WHERE id = ?').run(titulo, id).changes === 1 });
+});
+app.delete(`${API_PANEL}/referencias/:id`, requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  res.json({ ok: db.prepare('DELETE FROM referencias WHERE id = ?').run(id).changes === 1 });
 });
 
 app.post(`${API_PANEL}/servicios`, requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>
@@ -705,8 +756,42 @@ app.put(`${API_PANEL}/horario`, requireAdmin, (req, res) => {
 app.post(`${API_PANEL}/citas/:id/cancelar`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
   const r = db.prepare("UPDATE citas SET estado='cancelada' WHERE id = ? AND estado != 'cancelada'").run(id);
+  if (r.changes) sincronizarAgenda(); // se quita de la agenda de Google
   res.json({ ok: r.changes === 1 });
 });
+
+// ---------- agenda de Google: citas pagadas al calendario de la barbería ----------
+// Agrega las citas pagadas de hoy en adelante que aún no están y quita las canceladas. Si Google no responde,
+// se reintenta en la siguiente vuelta (cada 10 min o con el siguiente pago); el id del evento evita duplicados.
+let sincronizando = null, otraVuelta = false;
+function sincronizarAgenda() {
+  if (!agenda.activa()) return Promise.resolve();
+  if (sincronizando) { otraVuelta = true; return sincronizando; }
+  sincronizando = (async () => {
+    do {
+      otraVuelta = false;
+      const nuevas = db.prepare("SELECT id FROM citas WHERE estado = 'pagada' AND agenda_en IS NULL AND fecha >= ? ORDER BY id LIMIT 50")
+        .all(ahoraMX().fecha);
+      for (const { id } of nuevas) {
+        let marca = "datetime('now')";
+        try { await agenda.agregar(citaCompleta('c.id = ?', id), negocio()); } catch (e) {
+          if (!e.permanente) throw e; // Google caído o sin permiso: se reintenta después
+          console.error('[agenda de Google] cita', id, e.message);
+          marca = "'omitida'"; // Google rechaza esta cita: no se reintenta en cada vuelta
+        }
+        db.prepare(`UPDATE citas SET agenda_en = ${marca} WHERE id = ?`).run(id);
+      }
+      const canceladas = db.prepare("SELECT id, codigo FROM citas WHERE estado = 'cancelada' AND agenda_en IS NOT NULL LIMIT 50").all();
+      for (const c of canceladas) {
+        await agenda.quitar(c.codigo);
+        db.prepare('UPDATE citas SET agenda_en = NULL WHERE id = ?').run(c.id);
+      }
+    } while (otraVuelta);
+  })().catch((e) => console.error('[agenda de Google]', e.message)).finally(() => { sincronizando = null; });
+  return sincronizando;
+}
+setTimeout(sincronizarAgenda, 20 * 1000);
+setInterval(sincronizarAgenda, 10 * 60 * 1000);
 
 // ---------- recordatorios: correo al cliente un día antes de su cita ----------
 // Cada 10 min busca citas pagadas que empiezan en las próximas 24 h y aún no tienen recordatorio.
@@ -745,4 +830,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);
   console.log(`Panel admin (ruta privada, no la compartas): ${BASE_URL}/${RUTA_PANEL}`);
+  if (agenda.activa()) console.log(`Agenda de Google activa → ${agenda.estado().calendario}`);
 });

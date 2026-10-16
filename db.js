@@ -65,6 +65,17 @@ CREATE TABLE IF NOT EXISTS fotos_barberos (
   version TEXT NOT NULL             -- huella corta del archivo: cambia la URL al cambiar la foto
 );
 
+-- Imágenes de referencia (trabajos de la barbería) que el dueño sube desde el panel; se ven en un carrusel
+CREATE TABLE IF NOT EXISTS referencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  titulo TEXT NOT NULL DEFAULT '',
+  tipo TEXT NOT NULL,
+  datos BLOB NOT NULL,
+  version TEXT NOT NULL,
+  orden INTEGER NOT NULL DEFAULT 0,
+  creada TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Horario de atención: 0 = domingo ... 6 = sábado. abre/cierra en NULL = cerrado ese día.
 CREATE TABLE IF NOT EXISTS horario (
   dia INTEGER PRIMARY KEY CHECK (dia BETWEEN 0 AND 6),
@@ -76,6 +87,8 @@ CREATE TABLE IF NOT EXISTS horario (
 // Columnas agregadas después de la primera versión (las bases ya creadas se actualizan solas)
 const columnas = db.prepare('PRAGMA table_info(citas)').all().map((c) => c.name);
 if (!columnas.includes('recordatorio_en')) db.exec('ALTER TABLE citas ADD COLUMN recordatorio_en TEXT');
+// Cuándo se agregó la cita a la agenda de Google (NULL = aún no está, o ya se quitó)
+if (!columnas.includes('agenda_en')) db.exec('ALTER TABLE citas ADD COLUMN agenda_en TEXT');
 const colBarberos = db.prepare('PRAGMA table_info(barberos)').all().map((c) => c.name);
 if (!colBarberos.includes('descripcion')) db.exec("ALTER TABLE barberos ADD COLUMN descripcion TEXT NOT NULL DEFAULT ''");
 

@@ -14,7 +14,7 @@
 <header class="top"><div class="wrap">
   <div class="brand">{{{marcaHtml}}}</div>
   <nav class="top-nav">
-    <a href="#referencias" class="solo-referencias">Referencias</a>
+    <a href="#referencias" class="solo-referencias hidden">Referencias</a>
     <a href="#tienda">Tienda</a>
   </nav>
 </div></header>
@@ -93,12 +93,33 @@
       <div>
         <div class="eyebrow">Referencias</div>
         <h2>Nuestro trabajo</h2>
-        <p class="muted">Cortes, barbas y detalles hechos aquí. Desliza para ver más.</p>
+        <p class="muted">Cortes, barbas y detalles hechos aquí. Desliza para ver más y toca una imagen para verla completa.</p>
+      </div>
+      <div class="ruleta-ctrl hidden" id="ref-ctrl">
+        <button class="ruleta-btn" id="ref-prev" aria-label="Imagen anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <button class="ruleta-btn" id="ref-next" aria-label="Siguiente imagen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
       </div>
     </div>
+    <div class="ref-carrusel hidden" id="ref-carrusel" aria-roledescription="carrusel" aria-label="Imágenes de referencia"></div>
+    <div class="ruleta-dots" id="ref-dots"></div>
     <div class="ref-track" id="ref-track"></div>
   </div>
 </section>
+
+<!-- Visor: la imagen de referencia completa -->
+<dialog class="visor" id="visor" aria-label="Imagen de referencia">
+  <button type="button" class="visor-cerrar" id="visor-cerrar" aria-label="Cerrar">&times;</button>
+  <figure>
+    <img id="visor-img" alt="" />
+    <figcaption><span id="visor-txt"></span> <span class="muted" id="visor-num"></span></figcaption>
+  </figure>
+  <button type="button" class="ruleta-btn visor-prev" id="visor-prev" aria-label="Imagen anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <button type="button" class="ruleta-btn visor-next" id="visor-next" aria-label="Siguiente imagen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+</dialog>
 
 <section class="tienda" id="tienda">
   <div class="wrap">
@@ -190,7 +211,7 @@
       <ul class="f-list">
         <li><a href="#top">Inicio</a></li>
         <li><a href="#reserva">Reservar cita</a></li>
-        <li class="solo-referencias"><a href="#referencias">Referencias</a></li>
+        <li class="solo-referencias hidden"><a href="#referencias">Referencias</a></li>
         <li><a href="#tienda">Tienda</a></li>
         <li><a href="{{mapa}}" target="_blank" rel="noopener">Cómo llegar</a></li>
         <li><a href="privacidad.html">Aviso de privacidad</a></li>
@@ -508,10 +529,14 @@ function initRuleta() {
   setInterval(() => { if (!pausa && !document.hidden) ir(actual + 1); }, 6000);
 }
 
-// ---------- Referencias: videos de trabajos (los datos están en referencias.js) ----------
-function initReferencias() {
+// ---------- Referencias: imágenes en carrusel (las sube el dueño en el panel) y videos (referencias.js) ----------
+function initReferencias(imagenes) {
   const lista = typeof REFERENCIAS !== 'undefined' ? REFERENCIAS : [];
-  if (!lista.length) { document.querySelectorAll('.solo-referencias').forEach((e) => e.remove()); return; }
+  if (!lista.length && !imagenes.length) return;
+  document.querySelectorAll('.solo-referencias').forEach((e) => e.classList.remove('hidden'));
+  $('#referencias').classList.remove('hidden');
+  if (imagenes.length) carruselReferencias(imagenes);
+  if (!lista.length) return;
   $('#ref-track').innerHTML = lista.map((r) => `
     <figure class="ref">
       <video src="${esc(r.video)}" ${r.poster ? `poster="${esc(r.poster)}"` : ''} controls playsinline preload="${r.poster ? 'none' : 'metadata'}"></video>
@@ -521,7 +546,87 @@ function initReferencias() {
   $('#ref-track').addEventListener('play', (e) => {
     document.querySelectorAll('#ref-track video').forEach((v) => { if (v !== e.target) v.pause(); });
   }, true);
-  $('#referencias').classList.remove('hidden');
+}
+
+function carruselReferencias(imagenes) {
+  const car = $('#ref-carrusel'), n = imagenes.length;
+  car.innerHTML = imagenes.map((r, i) => `
+    <button type="button" class="ref-slide" data-i="${i}" aria-label="Ver imagen ${i + 1} de ${n}${r.titulo ? ': ' + esc(r.titulo) : ''}">
+      <img src="${esc(r.foto)}" alt="" loading="${i < 4 ? 'eager' : 'lazy'}" decoding="async" />
+      ${r.titulo ? `<span class="ref-cap">${esc(r.titulo)}</span>` : ''}
+    </button>`).join('');
+  car.classList.remove('hidden');
+  const slides = [...car.children];
+  // Cuántas caben a la vez depende del ancho (3 en computadora, 2 en tableta, 1 y un poco en celular)
+  const paso = () => (slides[1] ? slides[1].offsetLeft - slides[0].offsetLeft : car.clientWidth);
+  const ultima = () => Math.max(0, Math.ceil((car.scrollWidth - car.clientWidth) / paso() - 0.05));
+  let actual = 0, dots = [];
+  const marcar = () => dots.forEach((d, k) => d.classList.toggle('on', k === actual));
+  const armar = () => {
+    const u = ultima();
+    $('#ref-ctrl').classList.toggle('hidden', u === 0);
+    $('#ref-dots').innerHTML = u ? Array.from({ length: u + 1 }, (_, k) => `<button aria-label="Ir a la imagen ${k + 1}"></button>`).join('') : '';
+    dots = [...$('#ref-dots').children];
+    actual = Math.min(actual, u); marcar();
+  };
+  const ir = (i) => {
+    const u = ultima();
+    actual = i > u ? 0 : i < 0 ? u : i; // al final regresa al principio
+    car.scrollTo({ left: actual * paso(), behavior: 'smooth' });
+    marcar();
+  };
+  car.addEventListener('scroll', () => {
+    const i = Math.min(ultima(), Math.round(car.scrollLeft / paso()));
+    if (i !== actual) { actual = i; marcar(); }
+  }, { passive: true });
+  $('#ref-prev').onclick = () => ir(actual - 1);
+  $('#ref-next').onclick = () => ir(actual + 1);
+  $('#ref-dots').onclick = (e) => { const i = dots.indexOf(e.target.closest('button')); if (i >= 0) ir(i); };
+  addEventListener('resize', armar);
+  armar();
+
+  // Visor: la imagen completa, con flechas, teclado y deslizar
+  const visor = $('#visor');
+  let vi = 0;
+  const mostrar = (i) => {
+    vi = (i + n) % n;
+    const r = imagenes[vi];
+    $('#visor-img').src = r.foto; $('#visor-img').alt = r.titulo || `Imagen de referencia ${vi + 1}`;
+    $('#visor-txt').textContent = r.titulo || '';
+    $('#visor-num').textContent = `${vi + 1} / ${n}`;
+  };
+  car.onclick = (e) => {
+    const s = e.target.closest('.ref-slide'); if (!s) return;
+    mostrar(Number(s.dataset.i));
+    visor.showModal();
+  };
+  $('#visor-prev').onclick = () => mostrar(vi - 1);
+  $('#visor-next').onclick = () => mostrar(vi + 1);
+  $('#visor-cerrar').onclick = () => visor.close();
+  visor.addEventListener('click', (e) => { if (e.target === visor) visor.close(); }); // clic fuera de la imagen
+  visor.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') mostrar(vi - 1);
+    if (e.key === 'ArrowRight') mostrar(vi + 1);
+  });
+  let x0 = null;
+  visor.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  visor.addEventListener('touchend', (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50) mostrar(vi + (dx < 0 ? 1 : -1));
+  });
+  if (n < 2) { $('#visor-prev').classList.add('hidden'); $('#visor-next').classList.add('hidden'); }
+
+  // Avanza sola cada 5 s; se detiene si el cliente la está usando, si el visor está abierto o si prefiere menos movimiento
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let pausa = false;
+  const sec = $('#referencias');
+  sec.addEventListener('mouseenter', () => { pausa = true; });
+  sec.addEventListener('mouseleave', () => { pausa = false; });
+  sec.addEventListener('focusin', () => { pausa = true; });
+  sec.addEventListener('focusout', () => { pausa = false; });
+  sec.addEventListener('touchstart', () => { pausa = true; }, { passive: true });
+  setInterval(() => { if (!pausa && !visor.open && !document.hidden && ultima() > 0) ir(actual + 1); }, 5000);
 }
 
 // Fondo: la imagen del encabezado aparece fija y medio transparente conforme se baja
@@ -540,9 +645,9 @@ function initReferencias() {
   actualizar();
 })();
 
-initReferencias();
 initRuleta();
-init().catch(() => msg('No se pudo cargar la información. Recarga la página.'));
+init().catch(() => msg('No se pudo cargar la información. Recarga la página.'))
+  .finally(() => initReferencias(st.config?.referencias || []));
 </script>
 </body>
 </html>

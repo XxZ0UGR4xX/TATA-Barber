@@ -44,6 +44,7 @@ npm start
 | `BARBERIA_EMAIL` | Correo que **recibe** el aviso de cada cita. |
 | `SMTP_*` / `MAIL_FROM` | Cuenta desde la que se **envían** los correos. |
 | `MP_ACCESS_TOKEN` | Access Token de Mercado Pago para cobrar. Vacío = modo demo. |
+| `GOOGLE_CALENDAR_ID` / `GOOGLE_CREDENCIALES` | (Opcional) Agenda de Google: el calendario de la barbería y la llave JSON de la cuenta de servicio con permiso sobre él. Pasos en `DESPLIEGUE.md` (Paso 7). |
 | `PERMITIR_DEMO` | Solo en producción: `1` permite arrancar en modo demo (sin token). Sin esto, en Render el sitio no arranca si falta el token o la contraseña del panel (mínimo 8 caracteres). |
 
 ### Correo con Gmail
@@ -66,10 +67,14 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 - El `PASO` al inicio de `server.js` controla cada cuántos minutos hay un turno (30). El horario del pie de página se actualiza solo.
 - **Datos de la barbería (nombre, dirección, teléfono, WhatsApp, correo, redes):** el dueño los cambia en el panel → **"Configuración"** → "Datos de la barbería". Los valores de instalación, los **colores** y la **imagen del encabezado** están en `negocio.js`. Para instalar el sistema a otra barbería, cambia `negocio.js` y las imágenes de `public/img/`; no hace falta tocar el HTML.
 - **Tienda (ruleta de productos):** edita la lista en `public/productos.js` y pon las fotos en `public/img/`. Cada producto lleva marca, nombre, descripción, detalles, precio (o `null` para "Pregunta por el precio") y fotos. Los productos solo se apartan por WhatsApp y se pagan y recogen en tienda.
-- **Referencias (videos de trabajos):** pon los MP4 en `public/videos/` y agrégalos a la lista de `public/referencias.js`. Mientras la lista esté vacía, la sección no aparece.
+- **Referencias (imágenes de trabajos):** panel → pestaña **"Referencias"** → **Subir imágenes** (varias a la vez, hasta 30). En el sitio se ven en un **carrusel** (3 a la vez en computadora, 1 en celular) que avanza solo; al tocar una se abre completa. Se acomodan con flechas y cada una puede llevar un texto. El panel las reduce a máximo 1600 px y les quita los datos ocultos. Mientras no haya imágenes ni videos, la sección no aparece.
+- **Referencias (videos):** pon los MP4 en `public/videos/` y agrégalos a la lista de `public/referencias.js`; se muestran debajo del carrusel.
 - **Imagen del encabezado:** reemplaza `public/img/banner.webp` (y su versión ligera para celular, `banner-1000.webp`).
 
 - **Aviso de privacidad:** `public/privacidad.html` toma el nombre, dirección y contacto de la configuración. Es un modelo: conviene que lo revise un abogado antes de publicar.
+
+### Agenda de Google (Google Calendar)
+Con `GOOGLE_CALENDAR_ID` y `GOOGLE_CREDENCIALES` configurados, cada cita pagada **aparece sola** en el calendario de la barbería (título con barbero, servicio y cliente; un color por barbero; teléfono y código en la descripción) y **se quita** si se cancela en el panel. Si Google no responde, se reintenta cada 10 minutos sin duplicar. Sin configurarla, el correo de cada cita nueva trae el botón **"Agregar a Google Calendar"**. El correo de confirmación al cliente siempre trae **"Agregar a mi Google Calendar"**.
 
 ### Recordatorios
 Si el correo (SMTP) está configurado, el sistema manda solo un **recordatorio al cliente un día antes** de su cita (revisa cada 10 minutos). No se lo manda a citas pagadas hace menos de 3 horas, porque el cliente acaba de recibir su confirmación.
@@ -87,6 +92,7 @@ server.js        API, pagos, correos, sesión del admin, lógica de horarios
 db.js            Base de datos SQLite y datos iniciales
 negocio.js       Datos de la barbería: nombre, contacto, colores, banner
 mail.js          Envío de correos (barbería + cliente)
+agenda.js        Agenda de Google: citas pagadas a Google Calendar (opcional)
 privado/
   panel.html     Panel del administrador (solo se sirve en la ruta secreta)
 public/
@@ -107,6 +113,7 @@ public/
 - **Sesión del panel:** la cookie solo lleva una llave aleatoria de 256 bits, sin datos dentro; en la base se guarda únicamente su huella SHA-256. Es `HttpOnly`, `SameSite=Strict` y, con HTTPS, `Secure` con prefijo `__Host-`. Cerrar sesión la invalida en el servidor; cambiar `ADMIN_PASS` o `SESSION_SECRET` cierra todas las sesiones; máximo 5 sesiones abiertas.
 - **Panel oculto:** sin botones en el sitio; vive en una ruta secreta (`PANEL_RUTA`) y su API también (`/api/<ruta>/…`). `/admin.html` y `/api/admin/…` no existen. La página del panel no se indexa en buscadores y no envía la dirección como *referer*. Es una capa extra: la protección real es la contraseña, la sesión y el límite de intentos.
 - **Fotos de barberos:** solo se suben con sesión del panel; se aceptan JPG, PNG o WebP reconocidos por su contenido (no SVG), de máximo 1 MB. El panel las vuelve a dibujar antes de subirlas, lo que les quita los datos ocultos de la cámara (como la ubicación GPS). Se entregan como imagen con `nosniff` y `sandbox`: un archivo disfrazado no puede ejecutar código.
+- **Agenda de Google:** la cuenta de servicio solo pide permiso de *eventos de calendario* y solo puede tocar el calendario que el dueño le compartió. La llave se lee de una variable de entorno y nunca se muestra en la consola (ni en los mensajes de error).
 - **APIs encapsuladas:** las acciones (POST/PUT) solo se aceptan desde el propio sitio (`Origin` / `Sec-Fetch-Site`); sin CORS, otro sitio no puede leer las respuestas; los datos privados van con `Cache-Control: no-store`; la API pública solo devuelve lo necesario; rutas inexistentes responden un 404 neutro.
 - **Límites:** 300 consultas a la API cada 5 min por IP; 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; 5 intentos de login cada 15 min; reservas hasta 60 días adelante.
 - **Pagos:** cada pago se verifica con Mercado Pago (estado, monto y moneda); la confirmación solo muestra la cita si coincide su `preference_id`.
