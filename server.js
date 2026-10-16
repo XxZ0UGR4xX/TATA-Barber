@@ -15,6 +15,8 @@ const BASE_URL = (process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `ht
 const TZ = 'America/Mexico_City';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
+// Contraseñas de ejemplo (están a la vista en el repositorio): sirven para probar, nunca en producción
+const PASS_EJEMPLO = ['admin123', 'cambia-esta-clave', 'cambia-esta-contraseña'];
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 // Ruta secreta del panel: el sitio no tiene botones hacia él y /admin.html no existe. Su API vive bajo la misma
 // etiqueta (/api/<ruta>/...), así que /api/admin/... tampoco responde. Se elige con PANEL_RUTA; si no, se deriva
@@ -55,8 +57,8 @@ const MP_ES_PRUEBA = MP_TOKEN.startsWith('TEST-');
 // cualquiera podría entrar con admin123 o agendar citas "pagadas" sin pagar.
 if (process.env.RENDER || process.env.NODE_ENV === 'production') {
   const faltan = [];
-  if (!process.env.ADMIN_PASS || ADMIN_PASS === 'admin123' || ADMIN_PASS.length < 8) {
-    faltan.push('ADMIN_PASS (contraseña del panel, mínimo 8 caracteres)');
+  if (!process.env.ADMIN_PASS || PASS_EJEMPLO.includes(ADMIN_PASS) || ADMIN_PASS.length < 8) {
+    faltan.push('ADMIN_PASS (contraseña propia del panel, mínimo 8 caracteres)');
   }
   if (!process.env.SESSION_SECRET) faltan.push('SESSION_SECRET (Render lo genera solo con el Blueprint)');
   if (MODO_DEMO && process.env.PERMITIR_DEMO !== '1') {
@@ -70,7 +72,9 @@ if (process.env.RENDER || process.env.NODE_ENV === 'production') {
 
 if (MODO_DEMO) console.log('⚠  Sin MP_ACCESS_TOKEN: el pago funciona en MODO DEMO (simulado).');
 else console.log(`Mercado Pago activo (${MP_ES_PRUEBA ? 'credenciales de PRUEBA' : 'credenciales REALES'}).`);
-if (ADMIN_PASS === 'admin123') console.log('⚠  Usando contraseña de admin por defecto. Cámbiala en .env (ADMIN_PASS).');
+if (PASS_EJEMPLO.includes(ADMIN_PASS)) {
+  console.log(`⚠  El panel usa la contraseña de ejemplo → usuario: ${ADMIN_USER}  contraseña: ${ADMIN_PASS}  (cámbiala en .env, ADMIN_PASS)`);
+}
 
 // ---------- datos del negocio ----------
 // negocio.js trae los valores de instalación; lo que el dueño guarda en el panel (tabla ajustes) los reemplaza.

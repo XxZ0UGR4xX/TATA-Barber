@@ -24,7 +24,7 @@ npm install
 cp .env.example .env     # en Windows: copy .env.example .env
 ```
 
-Abre `.env` y rellena tus datos (ver abajo). Luego:
+Abre `.env` y rellena tus datos (ver abajo). El usuario y la contraseña del panel son los de `ADMIN_USER` y `ADMIN_PASS` (con el `.env` de ejemplo: `admin` / `cambia-esta-clave`; se respetan mayúsculas y minúsculas). Luego:
 
 ```bash
 npm start
