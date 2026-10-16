@@ -196,6 +196,18 @@ app.get(`/${RUTA_PANEL}`, (req, res) => {
     'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', // que la ruta no aparezca en buscadores ni se filtre
   }).send(plantilla(PANEL_HTML, { ...datosPagina(), nonce, apiPanel: API_PANEL }));
 });
+// Fotos de barberos: se entregan solo como imagen (con sandbox), así que aunque un archivo trajera código no se ejecuta
+app.get('/fotos/barberos/:id', (req, res, next) => {
+  const id = idValido(req.params.id);
+  const f = id && db.prepare('SELECT tipo, datos, version FROM fotos_barberos WHERE barbero_id = ?').get(id);
+  if (!f) return next();
+  res.set({
+    'Content-Type': f.tipo,
+    'Cache-Control': req.query.v === f.version ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  }).send(f.datos);
+});
 app.use(express.static(PUBLIC, { index: false }));
 
 // ---------- utilidades ----------
@@ -325,11 +337,25 @@ app.post('/api/mp/webhook', async (req, res) => {
   res.sendStatus(200); // responder rápido para que MP no reintente de más
 });
 
+// ---------- barberos y sus fotos ----------
+const SQL_BARBEROS = `SELECT b.id, b.nombre, b.descripcion, b.activo, f.version
+  FROM barberos b LEFT JOIN fotos_barberos f ON f.barbero_id = b.id`;
+const urlFoto = (id, version) => (version ? `/fotos/barberos/${id}?v=${version}` : null);
+const conFoto = ({ version, ...b }) => ({ ...b, foto: urlFoto(b.id, version) });
+// Solo JPG, PNG y WebP, reconocidos por sus primeros bytes (no por lo que diga quien sube el archivo)
+function tipoImagen(buf) {
+  if (buf.length < 16) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+
 // ---------- API pública ----------
 app.get('/api/config', (req, res) => {
   const h = horario();
   res.json({
-    barberos: db.prepare('SELECT id, nombre FROM barberos WHERE activo = 1').all(),
+    barberos: db.prepare(`${SQL_BARBEROS} WHERE b.activo = 1 ORDER BY b.id`).all().map(conFoto).map(({ activo, ...b }) => b),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
     diasCerrados: Object.keys(h).filter((d) => !h[d]).map(Number),
     horario: h,
@@ -573,9 +599,9 @@ const texto = (v, max) => String(v ?? '').trim().slice(0, max);
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function leerBarbero(b = {}) {
-  const nombre = texto(b.nombre, 40), especialidad = texto(b.especialidad, 60);
+  const nombre = texto(b.nombre, 40), descripcion = texto(String(b.descripcion ?? '').replace(/\s+/g, ' '), 160);
   if (nombre.length < 2) return { error: 'Escribe el nombre del barbero' };
-  return { valores: [nombre, especialidad, b.activo === false ? 0 : 1] };
+  return { valores: [nombre, descripcion, b.activo === false ? 0 : 1] };
 }
 function leerServicio(s = {}) {
   const nombre = texto(s.nombre, 50), descripcion = texto(s.descripcion, 100);
@@ -591,7 +617,7 @@ const responder = (res, r, ejecutar) => (r.error ? res.status(400).json({ error:
 
 app.get(`${API_PANEL}/catalogo`, requireAdmin, (req, res) => {
   res.json({
-    barberos: db.prepare('SELECT id, nombre, especialidad, activo FROM barberos ORDER BY id').all(),
+    barberos: db.prepare(`${SQL_BARBEROS} ORDER BY b.id`).all().map(conFoto),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion, activo FROM servicios ORDER BY id').all(),
     horario: horario(),
     paso: PASO,
@@ -624,10 +650,28 @@ app.put(`${API_PANEL}/negocio`, requireAdmin, (req, res) => {
 });
 
 app.post(`${API_PANEL}/barberos`, requireAdmin, (req, res) => responder(res, leerBarbero(req.body), (v) =>
-  ({ id: Number(db.prepare('INSERT INTO barberos (nombre, especialidad, activo) VALUES (?,?,?)').run(...v).lastInsertRowid) })));
+  ({ id: Number(db.prepare('INSERT INTO barberos (nombre, descripcion, activo) VALUES (?,?,?)').run(...v).lastInsertRowid) })));
 app.put(`${API_PANEL}/barberos/:id`, requireAdmin, (req, res) => {
   const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
-  responder(res, leerBarbero(req.body), (v) => ({ ok: db.prepare('UPDATE barberos SET nombre = ?, especialidad = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
+  responder(res, leerBarbero(req.body), (v) => ({ ok: db.prepare('UPDATE barberos SET nombre = ?, descripcion = ?, activo = ? WHERE id = ?').run(...v, id).changes === 1 }));
+});
+// Foto del barbero: el panel la recorta y reduce a 600×600 (≈60 KB, sin datos de ubicación) antes de subirla
+app.put(`${API_PANEL}/barberos/:id/foto`, requireAdmin,
+  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '1mb' }), (req, res) => {
+    const id = idValido(req.params.id);
+    if (!id || !db.prepare('SELECT 1 FROM barberos WHERE id = ?').get(id)) return res.status(404).json({ error: 'No encontrado' });
+    if (!Buffer.isBuffer(req.body)) return res.status(415).json({ error: 'Sube una imagen JPG, PNG o WebP' });
+    const tipo = tipoImagen(req.body);
+    if (!tipo) return res.status(400).json({ error: 'El archivo no es una imagen JPG, PNG o WebP' });
+    const version = crypto.createHash('sha256').update(req.body).digest('hex').slice(0, 12);
+    db.prepare(`INSERT INTO fotos_barberos (barbero_id, tipo, datos, version) VALUES (?,?,?,?)
+      ON CONFLICT(barbero_id) DO UPDATE SET tipo = excluded.tipo, datos = excluded.datos, version = excluded.version`)
+      .run(id, tipo, req.body, version);
+    res.json({ ok: true, foto: urlFoto(id, version) });
+  });
+app.delete(`${API_PANEL}/barberos/:id/foto`, requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  res.json({ ok: db.prepare('DELETE FROM fotos_barberos WHERE barbero_id = ?').run(id).changes === 1 });
 });
 
 app.post(`${API_PANEL}/servicios`, requireAdmin, (req, res) => responder(res, leerServicio(req.body), (v) =>

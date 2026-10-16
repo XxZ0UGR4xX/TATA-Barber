@@ -277,9 +277,11 @@ async function init() {
       <div class="p">${money(Number(s.precio))}</div>
     </button>`).join('');
   $('#barberos').innerHTML = st.config.barberos.map((b) => `
-    <button class="opt" data-id="${Number(b.id)}">
-      <div class="avatar">${esc(b.nombre[0])}</div>
+    <button class="opt barbero" data-id="${Number(b.id)}">
+      ${b.foto ? `<img class="foto" src="${esc(b.foto)}" alt="" width="96" height="96" loading="lazy" decoding="async" />`
+        : `<div class="avatar" aria-hidden="true">${esc(b.nombre.trim()[0] || '')}</div>`}
       <div class="t">${esc(b.nombre)}</div>
+      ${b.descripcion ? `<div class="s">${esc(b.descripcion)}</div>` : ''}
     </button>`).join('');
   construirDias();
   pintarHorario(st.config.horario);

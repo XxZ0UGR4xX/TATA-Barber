@@ -7,7 +7,7 @@
 <title>Administrador · {{nombre}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="/styles.css" />
 <style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
 </head>
 <body>
@@ -96,7 +96,7 @@
       </div>
       <div class="card">
         <h2>Barberos</h2>
-        <p class="muted">Desmarca "Visible" para que un barbero ya no aparezca al reservar. Sus citas pasadas se conservan.</p>
+        <p class="muted">La foto y la descripción se ven cuando el cliente elige barbero. Desmarca "Visible" para que un barbero ya no aparezca al reservar. Sus citas pasadas se conservan.</p>
         <div class="filas" id="cfg-barberos"></div>
         <button class="btn ghost sm" id="add-barbero">+ Agregar barbero</button>
       </div>
@@ -236,9 +236,20 @@ function aviso(texto, tipo = 'ok') {
 const casilla = (activo) => `<label class="check"><input type="checkbox" name="activo" ${activo ? 'checked' : ''} /> Visible</label>`;
 const claseFila = (tipo, x) => `fila ${tipo}${x.id ? '' : ' nueva'}${x.activo ? '' : ' oculto'}`;
 
-function filaBarbero(b = { id: '', nombre: '', activo: 1 }) {
+const inicial = (nombre) => (String(nombre || '').trim()[0] || '?').toUpperCase();
+function filaBarbero(b = { id: '', nombre: '', descripcion: '', activo: 1, foto: null }) {
+  const d = b.descripcion || '';
   return `<div class="${claseFila('barbero', b)}" data-tipo="barberos" data-id="${b.id}">
-    <div class="ancho"><label>Nombre</label><input name="nombre" maxlength="40" value="${esc(b.nombre)}" /></div>
+    <div class="foto-barbero">
+      <div class="foto-marco">${b.foto ? `<img src="${esc(b.foto)}" alt="" />` : `<span>${esc(inicial(b.nombre))}</span>`}</div>
+      <label class="btn ghost sm subir"><span>${b.foto ? 'Cambiar foto' : 'Subir foto'}</span><input type="file" accept="image/*" data-foto /></label>
+      <button type="button" class="quitar-foto" data-quitar-foto ${b.foto ? '' : 'hidden'}>Quitar foto</button>
+    </div>
+    <div class="datos-barbero">
+      <div><label>Nombre</label><input name="nombre" maxlength="40" value="${esc(b.nombre)}" /></div>
+      <div><label>Descripción breve <small data-cuenta>${d.length}/160</small></label>
+        <textarea name="descripcion" maxlength="160" rows="2" placeholder="Ej. 8 años de experiencia. Fades, barba clásica y diseños.">${esc(d)}</textarea></div>
+    </div>
     ${casilla(b.activo)}
     <button class="btn sm" data-guardar>${b.id ? 'Guardar' : 'Agregar'}</button>
   </div>`;
@@ -280,7 +291,7 @@ $('#save-negocio').onclick = async () => {
   aviso(r.ok ? 'Datos guardados. Ya se ven en el sitio.' : d.error || 'No se pudo guardar', r.ok ? 'ok' : 'err');
   if (r.ok) cargarCatalogo();
 };
-$('#add-barbero').onclick = () => { $('#cfg-barberos').insertAdjacentHTML('beforeend', filaBarbero()); $('#cfg-barberos .fila:last-child input').focus(); };
+$('#add-barbero').onclick = () => { $('#cfg-barberos').insertAdjacentHTML('beforeend', filaBarbero()); $('#cfg-barberos .fila:last-child [name=nombre]').focus(); };
 $('#add-servicio').onclick = () => { $('#cfg-servicios').insertAdjacentHTML('beforeend', filaServicio()); $('#cfg-servicios .fila:last-child input').focus(); };
 
 $('#tab-config').addEventListener('click', async (e) => {
@@ -295,11 +306,82 @@ $('#tab-config').addEventListener('click', async (e) => {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) return aviso(d.error || 'No se pudo guardar', 'err');
-    aviso(id ? 'Cambios guardados.' : 'Agregado.');
+    let msg = id ? 'Cambios guardados.' : 'Agregado.', tipoMsg = 'ok';
+    const foto = !id && fotosPendientes.get(fila);
+    if (foto) {
+      try { await subirFoto(d.id, foto); msg = 'Barbero agregado con su foto.'; }
+      catch (err) { if (err.message === 'no-auth') throw err; msg = `Barbero agregado, pero la foto no se subió: ${err.message}`; tipoMsg = 'err'; }
+    }
+    aviso(msg, tipoMsg);
     await cargarCatalogo();
   } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
   finally { btn.disabled = false; }
 });
+
+// ---------- fotos de barberos ----------
+// La foto se recorta en cuadro y se reduce a 600×600 aquí mismo, antes de subirla: pesa poco y, al volver a
+// dibujarla, se le quitan los datos ocultos del archivo (como la ubicación GPS de la cámara).
+const fotosPendientes = new WeakMap(); // barbero nuevo: la foto se sube al dar "Agregar"
+async function prepararFoto(archivo) {
+  if (!/^image\//.test(archivo.type)) throw new Error('Elige una imagen (JPG, PNG o WebP).');
+  if (archivo.size > 25 * 1024 * 1024) throw new Error('La imagen pesa demasiado (máximo 25 MB).');
+  let img;
+  try { img = await createImageBitmap(archivo); } catch { throw new Error('No se pudo leer la imagen. Prueba con una foto JPG o PNG.'); }
+  const lado = Math.min(img.width, img.height);
+  if (lado < 150) throw new Error('La foto es muy pequeña (mínimo 150 × 150 píxeles).');
+  const L = Math.min(600, lado);
+  const x = (img.width - lado) / 2, y = img.height > img.width ? (img.height - lado) * 0.2 : 0; // vertical: la cara suele ir arriba
+  const c = document.createElement('canvas'); c.width = c.height = L;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, x, y, lado, lado, 0, 0, L, L);
+  img.close?.();
+  const comoBlob = (tipo) => new Promise((ok) => c.toBlob(ok, tipo, 0.85));
+  let blob = await comoBlob('image/webp');
+  if (!blob || blob.type !== 'image/webp') blob = await comoBlob('image/jpeg'); // Safari no genera WebP
+  if (!blob) throw new Error('No se pudo procesar la imagen.');
+  return { blob, vista: c.toDataURL('image/jpeg', 0.8) };
+}
+async function subirFoto(id, blob) {
+  const r = await api(`${API}/barberos/${Number(id)}/foto`, { method: 'PUT', headers: { 'Content-Type': blob.type }, body: blob });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'No se pudo subir la foto.');
+}
+function pintarFoto(fila, src) {
+  const marco = fila.querySelector('.foto-marco');
+  if (src) { const img = new Image(); img.alt = ''; img.src = src; marco.replaceChildren(img); }
+  else marco.replaceChildren(Object.assign(document.createElement('span'), { textContent: inicial(fila.querySelector('[name=nombre]').value) }));
+  fila.querySelector('.subir span').textContent = src ? 'Cambiar foto' : 'Subir foto';
+  fila.querySelector('[data-quitar-foto]').hidden = !src;
+}
+$('#cfg-barberos').addEventListener('change', async (e) => {
+  if (!e.target.matches('[data-foto]')) return;
+  const input = e.target, fila = input.closest('.fila'), archivo = input.files[0];
+  input.value = ''; if (!archivo) return;
+  const etiqueta = fila.querySelector('.subir'); etiqueta.classList.add('cargando');
+  try {
+    const { blob, vista } = await prepararFoto(archivo);
+    if (!fila.dataset.id) { fotosPendientes.set(fila, blob); pintarFoto(fila, vista); return aviso('Foto lista. Se guarda al dar "Agregar".'); }
+    await subirFoto(fila.dataset.id, blob);
+    pintarFoto(fila, vista);
+    aviso('Foto guardada. Ya se ve en el sitio.');
+  } catch (err) { if (err.message !== 'no-auth') aviso(err.message, 'err'); }
+  finally { etiqueta.classList.remove('cargando'); }
+});
+$('#cfg-barberos').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-quitar-foto]'); if (!btn) return;
+  const fila = btn.closest('.fila');
+  if (!fila.dataset.id) { fotosPendientes.delete(fila); return pintarFoto(fila, null); }
+  if (!confirm('¿Quitar la foto de este barbero?')) return;
+  try {
+    const r = await api(`${API}/barberos/${Number(fila.dataset.id)}/foto`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('No se pudo quitar la foto.');
+    pintarFoto(fila, null); aviso('Foto quitada.');
+  } catch (err) { if (err.message !== 'no-auth') aviso(err.message, 'err'); }
+});
+$('#cfg-barberos').addEventListener('input', (e) => {
+  if (e.target.name === 'descripcion') e.target.closest('.fila').querySelector('[data-cuenta]').textContent = `${e.target.value.length}/160`;
+});
+
 $('#cfg-horario').addEventListener('change', (e) => {
   if (e.target.name !== 'abierto') return;
   e.target.closest('.dia-fila').querySelectorAll('input[type=time]').forEach((i) => { i.disabled = !e.target.checked; });

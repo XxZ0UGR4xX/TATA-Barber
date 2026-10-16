@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS ajustes (
   valor TEXT NOT NULL
 );
 
+-- Foto de cada barbero (la sube el dueño desde el panel). Se guarda en la base para que viaje con los respaldos.
+CREATE TABLE IF NOT EXISTS fotos_barberos (
+  barbero_id INTEGER PRIMARY KEY REFERENCES barberos(id),
+  tipo TEXT NOT NULL,               -- image/webp | image/jpeg | image/png
+  datos BLOB NOT NULL,
+  version TEXT NOT NULL             -- huella corta del archivo: cambia la URL al cambiar la foto
+);
+
 -- Horario de atención: 0 = domingo ... 6 = sábado. abre/cierra en NULL = cerrado ese día.
 CREATE TABLE IF NOT EXISTS horario (
   dia INTEGER PRIMARY KEY CHECK (dia BETWEEN 0 AND 6),
@@ -68,6 +76,8 @@ CREATE TABLE IF NOT EXISTS horario (
 // Columnas agregadas después de la primera versión (las bases ya creadas se actualizan solas)
 const columnas = db.prepare('PRAGMA table_info(citas)').all().map((c) => c.name);
 if (!columnas.includes('recordatorio_en')) db.exec('ALTER TABLE citas ADD COLUMN recordatorio_en TEXT');
+const colBarberos = db.prepare('PRAGMA table_info(barberos)').all().map((c) => c.name);
+if (!colBarberos.includes('descripcion')) db.exec("ALTER TABLE barberos ADD COLUMN descripcion TEXT NOT NULL DEFAULT ''");
 
 // Datos iniciales (solo si las tablas están vacías). Después se editan desde el panel de administrador.
 if (db.prepare('SELECT COUNT(*) AS n FROM horario').get().n === 0) {

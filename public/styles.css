@@ -93,7 +93,7 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
 .steps button.actual { border-color: var(--gold); color: var(--accent-ink); background: var(--gold-grad); font-weight: 600; }
 
 /* Asistente de reserva: un paso a la vez */
-.reserva { scroll-margin-top: 12px; }
+.reserva { scroll-margin-top: 12px; overflow-x: clip; } /* la animación entre pasos no ensancha la página en celular */
 .eleccion { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .eleccion:empty { display: none; }
 .chip {
@@ -140,6 +140,18 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
   width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
   background: var(--gold-grad); color: var(--accent-ink); font-weight: 700; margin-bottom: 8px;
 }
+/* Tarjeta de barbero: foto redonda con aro dorado, nombre y descripción breve */
+.opt.barbero { align-items: center; text-align: center; gap: 4px; padding: 20px 16px 18px; }
+.opt.barbero .foto, .opt.barbero .avatar {
+  width: 96px; height: 96px; border-radius: 50%; margin-bottom: 10px; flex: 0 0 auto;
+  box-shadow: 0 0 0 3px var(--panel-2), 0 0 0 4px var(--gold-line);
+}
+.opt.barbero .foto { display: block; object-fit: cover; background: var(--panel); }
+.opt.barbero .avatar { font-family: Oswald, sans-serif; font-size: 2.2rem; font-weight: 600; }
+.opt.barbero .t { font-size: 1.05rem; }
+.opt.barbero .t, .opt.barbero .s { max-width: 100%; overflow-wrap: anywhere; }
+.opt.barbero .s { line-height: 1.45; }
+.opt.barbero:hover .foto, .opt.barbero.sel .foto, .opt.barbero.sel .avatar { box-shadow: 0 0 0 3px var(--panel-2), 0 0 0 5px var(--gold); }
 
 .days { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
 .day {
@@ -161,11 +173,12 @@ header.top .wrap { display: flex; align-items: center; justify-content: space-be
 .slot:disabled { opacity: .3; cursor: not-allowed; text-decoration: line-through; }
 
 label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
-input, select {
+input, select, textarea {
   width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line);
   background: var(--panel-2); color: var(--text); font: inherit;
 }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+textarea { resize: vertical; min-height: 64px; line-height: 1.45; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .form-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
 .btn {
@@ -402,7 +415,24 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
   display: grid; gap: 10px; align-items: end; padding: 12px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
 }
-.fila.barbero { grid-template-columns: 1fr auto auto; }
+.fila.barbero { grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; }
+.fila.barbero .check { padding-bottom: 0; }
+.foto-barbero { display: grid; justify-items: center; gap: 8px; width: 140px; }
+.foto-marco {
+  width: 92px; height: 92px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  background: var(--gold-grad); color: var(--accent-ink); font: 600 2rem Oswald, sans-serif;
+  box-shadow: 0 0 0 3px var(--panel-2), 0 0 0 4px var(--gold-line);
+}
+.foto-marco img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fila .subir { position: relative; margin: 0; padding: 8px 10px; width: 100%; cursor: pointer; font-size: .72rem; white-space: nowrap; }
+.subir input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.subir:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.subir.cargando { opacity: .5; pointer-events: none; }
+.quitar-foto { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: .78rem; text-decoration: underline; cursor: pointer; }
+.quitar-foto:hover { color: var(--bad); }
+.datos-barbero { display: grid; gap: 10px; }
+.datos-barbero label small { float: right; color: var(--muted); font-size: .75rem; }
+.fila textarea { background: var(--panel); }
 .fila.servicio { grid-template-columns: 1.1fr 1.7fr 100px 110px auto auto; }
 .fila.nueva { border-style: dashed; border-color: var(--gold-line); }
 .fila.oculto > div { opacity: .55; }
@@ -420,6 +450,9 @@ button.stat { font: inherit; color: inherit; text-align: left; cursor: pointer; 
 .toast .msg { box-shadow: 0 10px 30px rgba(0, 0, 0, .5); text-align: center; }
 @media (max-width: 760px) {
   .fila.barbero, .fila.servicio { grid-template-columns: 1fr 1fr; }
-  .fila .ancho { grid-column: 1 / -1; }
+  .fila .ancho, .fila .foto-barbero, .fila .datos-barbero { grid-column: 1 / -1; }
+  .foto-barbero { width: auto; grid-template-columns: 76px auto; grid-template-rows: auto auto; justify-items: start; align-items: center; column-gap: 14px; row-gap: 6px; }
+  .foto-marco { width: 76px; height: 76px; grid-row: 1 / 3; }
+  .fila .subir { width: auto; }
   .dia-fila { grid-template-columns: 100px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
 }
