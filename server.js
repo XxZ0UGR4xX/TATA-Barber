@@ -460,7 +460,8 @@ app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas se
     if (!citaId) return res.status(409).json({ error: 'Ese horario ya no está disponible. Elige otro.' });
 
     if (MODO_DEMO) {
-      return res.json({ url: `${BASE_URL}/pago-demo.html?codigo=${codigo}`, codigo });
+      // Ruta relativa: funciona igual en esta computadora, en el celular por la red local o en línea
+      return res.json({ url: `/pago-demo.html?codigo=${codigo}`, codigo });
     }
 
     // Crear preferencia de pago en Mercado Pago (Checkout Pro)
@@ -477,7 +478,8 @@ app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas se
         payer: { name: n, email: e },
         external_reference: String(citaId),
         metadata: { cita_id: citaId, codigo },
-        statement_descriptor: negocio().nombre.toUpperCase().slice(0, 22), // lo que aparece en el estado de cuenta
+        // Lo que aparece en el estado de cuenta: solo letras, números y espacios ("STYLE CUTS")
+        statement_descriptor: negocio().nombre.normalize('NFD').replace(/[^A-Za-z0-9 ]/g, '').toUpperCase().slice(0, 22),
         back_urls: {
           success: `${BASE_URL}/gracias.html`,
           pending: `${BASE_URL}/gracias.html`,
@@ -485,7 +487,9 @@ app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas se
         },
         // auto_return solo funciona con URL https pública
         ...(BASE_URL.startsWith('https') ? { auto_return: 'approved' } : {}),
-        notification_url: `${BASE_URL}/api/mp/webhook`,
+        // El aviso de Mercado Pago solo llega a una dirección pública con https; en pruebas locales el pago
+        // se confirma cuando el cliente regresa a gracias.html
+        ...(BASE_URL.startsWith('https') ? { notification_url: `${BASE_URL}/api/mp/webhook` } : {}),
         expires: true,
         // El enlace de pago dura lo mismo que el apartado del horario
         expiration_date_to: new Date(Date.now() + HOLD_MINUTES * 60 * 1000).toISOString(),
@@ -859,5 +863,11 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);
   console.log(`Panel admin (ruta privada, no la compartas): ${BASE_URL}/${RUTA_PANEL}`);
+  // En pruebas locales: las direcciones para abrir el sitio desde el celular u otra computadora de la misma red
+  if (!process.env.BASE_URL && !process.env.RENDER_EXTERNAL_URL) {
+    const ips = Object.values(os.networkInterfaces()).flat()
+      .filter((i) => i && !i.internal && (i.family === 'IPv4' || i.family === 4)).map((i) => i.address);
+    for (const ip of ips) console.log(`En tu red (celular u otra computadora): http://${ip}:${PORT}  ·  panel: http://${ip}:${PORT}/${RUTA_PANEL}`);
+  }
   if (agenda.activa()) console.log(`Agenda de Google activa → ${agenda.estado().calendario}`);
 });

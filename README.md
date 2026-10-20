@@ -33,6 +33,15 @@ npm start
 - Sitio de reservas: http://localhost:3000
 - Panel de administrador: **no tiene botón en el sitio**. Su dirección es secreta y aparece en la consola al arrancar (`Panel admin (ruta privada…): http://localhost:3000/…`). Para elegirla tú, define `PANEL_RUTA` en `.env`.
 
+### Probar desde el celular u otra computadora (misma red Wi-Fi)
+1. Arranca con `npm start`. Además de `localhost`, la consola muestra una línea por cada red, por ejemplo:
+   `En tu red (celular u otra computadora): http://192.168.1.50:3000  ·  panel: http://192.168.1.50:3000/…`
+2. Abre esa dirección en el celular, conectado **a la misma red Wi-Fi** que la computadora.
+3. En Windows, la primera vez aparece un aviso del Firewall para Node.js: permite el acceso en **redes privadas**. Si no aparece y no carga, revisa que la red Wi-Fi esté marcada como **privada**.
+4. La computadora debe quedarse encendida y con el servidor corriendo. La IP puede cambiar al reconectarte a la red: revisa la consola.
+
+En modo demo todo funciona por la red, incluido el pago simulado. Con un token de prueba de Mercado Pago (`TEST-…`), pon además `BASE_URL=http://TU-IP:3000` en `.env`, para que Mercado Pago regrese al cliente a tu computadora después de pagar. El aviso automático de Mercado Pago (webhook) no llega a una red local; ahí el pago se confirma cuando el cliente regresa al sitio.
+
 ## 3. Configuración (`.env`)
 
 | Variable | Para qué sirve |
