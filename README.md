@@ -40,6 +40,12 @@ npm start
 3. En Windows, la primera vez aparece un aviso del Firewall para Node.js: permite el acceso en **redes privadas**. Si no aparece y no carga, revisa que la red Wi-Fi esté marcada como **privada**.
 4. La computadora debe quedarse encendida y con el servidor corriendo. La IP puede cambiar al reconectarte a la red: revisa la consola.
 
+**Si el celular dice "No se puede acceder" (`ERR_ADDRESS_UNREACHABLE` o `ERR_CONNECTION_TIMED_OUT`):**
+- Usa la dirección del adaptador **Wi-Fi** (casi siempre `192.168.x.x` o `10.x.x.x`). Una `169.254.x.x` es de un adaptador sin conexión y nunca funciona. En Windows la confirmas con `ipconfig` → "Adaptador de LAN inalámbrica Wi-Fi" → "Dirección IPv4".
+- El celular debe estar en **el mismo Wi-Fi**, no con datos móviles ni en la red de invitados (las redes de invitados suelen impedir que los equipos se vean entre sí).
+- En Windows: **Configuración → Red e Internet → Wi-Fi → (tu red)** → perfil de red **Privada**. Con perfil "Pública", el Firewall bloquea las conexiones de otros equipos.
+- Si tienes una VPN activa en la computadora, apágala mientras pruebas.
+
 En modo demo todo funciona por la red, incluido el pago simulado. Con un token de prueba de Mercado Pago (`TEST-…`), pon además `BASE_URL=http://TU-IP:3000` en `.env`, para que Mercado Pago regrese al cliente a tu computadora después de pagar. El aviso automático de Mercado Pago (webhook) no llega a una red local; ahí el pago se confirma cuando el cliente regresa al sitio.
 
 ## 3. Configuración (`.env`)

@@ -864,10 +864,19 @@ app.listen(PORT, () => {
   console.log(`Barbería lista en ${BASE_URL}`);
   console.log(`Panel admin (ruta privada, no la compartas): ${BASE_URL}/${RUTA_PANEL}`);
   // En pruebas locales: las direcciones para abrir el sitio desde el celular u otra computadora de la misma red
+  // Se omiten las 169.254.x.x (adaptador sin conexión) y los adaptadores virtuales van al final
   if (!process.env.BASE_URL && !process.env.RENDER_EXTERNAL_URL) {
-    const ips = Object.values(os.networkInterfaces()).flat()
-      .filter((i) => i && !i.internal && (i.family === 'IPv4' || i.family === 4)).map((i) => i.address);
-    for (const ip of ips) console.log(`En tu red (celular u otra computadora): http://${ip}:${PORT}  ·  panel: http://${ip}:${PORT}/${RUTA_PANEL}`);
+    const VIRTUAL = /vethernet|virtual|vmware|vbox|wsl|hyper-v|docker|bridge|tailscale|zerotier|vpn|loopback/i;
+    const redes = Object.entries(os.networkInterfaces())
+      .flatMap(([nombre, lista]) => (lista || []).map((i) => ({ nombre, ...i })))
+      .filter((i) => !i.internal && (i.family === 'IPv4' || i.family === 4) && !i.address.startsWith('169.254.'))
+      .map((i) => ({ ...i, virtual: VIRTUAL.test(i.nombre) }))
+      .sort((a, b) => a.virtual - b.virtual);
+    if (!redes.length) console.log('No hay red local: conecta esta computadora al Wi-Fi para probar desde el celular.');
+    for (const r of redes) {
+      console.log(`En tu red [${r.nombre}${r.virtual ? ', adaptador virtual: probablemente no sirve' : ''}]: ` +
+        `http://${r.address}:${PORT}  ·  panel: http://${r.address}:${PORT}/${RUTA_PANEL}`);
+    }
   }
   if (agenda.activa()) console.log(`Agenda de Google activa → ${agenda.estado().calendario}`);
 });
