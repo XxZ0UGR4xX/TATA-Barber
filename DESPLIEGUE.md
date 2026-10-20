@@ -1,10 +1,10 @@
-# Cómo poner Tata Barber en línea (cobrando de verdad)
+# Cómo poner Style Cut's en línea (cobrando de verdad)
 
 Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
 
 ## Resumen de costos
 - **Hosting (Render Starter + disco de 1 GB):** US$7.25/mes (~$125–145 MXN según el dólar y tu banco). Siempre encendido.
-- **Dominio** (ej. `tatabarber.com`): ~$150–300 MXN el primer año; ~$300–550 al renovar. Opcional al inicio.
+- **Dominio** (ej. `stylecuts.com`): ~$150–300 MXN el primer año; ~$300–550 al renovar. Opcional al inicio.
 - **Correos:** gratis con Gmail (contraseña de aplicación).
 - **Agenda de Google (Google Calendar):** gratis.
 - **Mercado Pago:** sin mensualidad. Comisión de 3.49% (al instante) a 2.95% (a 30 días) + IVA por pago, y puede sumarse un cargo fijo de $4 + IVA; lo eliges y lo ves en tu cuenta de Mercado Pago.
@@ -30,9 +30,9 @@ Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
 ## Paso 4 — Despliega en Render
 1. Entra a https://render.com y conecta tu GitHub.
 2. **New → Blueprint** y elige el repo (detecta el archivo `render.yaml` incluido).
-3. Render creará el servicio **tata-barber** con su disco persistente ya configurado.
+3. Render creará el servicio **style-cuts** con su disco persistente ya configurado.
 4. En **Environment**, llena las variables:
-   - `ADMIN_USER` → usuario del panel (ej. `tata`)
+   - `ADMIN_USER` → usuario del panel (ej. `stylecuts`)
    - `ADMIN_PASS` → una contraseña fuerte
    - `PANEL_RUTA` → la dirección secreta del panel, p. ej. `gestion-sc-8k2v9q4w` (12 a 64 letras, números o guiones; invéntala y no la compartas). Si la dejas vacía se genera una sola y aparece en **Logs**
    - `BARBERIA_EMAIL` → correo donde quieres recibir el aviso de cada cita
@@ -40,10 +40,10 @@ Guía paso a paso. La ruta más sencilla es **Render**. Tiempo: ~30–40 min.
    - `SMTP_PORT` → `587`
    - `SMTP_USER` → el Gmail de la barbería
    - `SMTP_PASS` → la contraseña de aplicación del Paso 3
-   - `MAIL_FROM` → `Tata Barber <el-gmail@gmail.com>`
+   - `MAIL_FROM` → `Style Cut's <el-gmail@gmail.com>`
    - `MP_ACCESS_TOKEN` → tu Access Token de Mercado Pago
    - (`SESSION_SECRET` se genera solo. `BASE_URL` no hace falta: el sistema usa la URL pública de Render)
-5. Dale **Deploy**. Si falta `ADMIN_PASS` (mínimo 8 caracteres) o `MP_ACCESS_TOKEN`, el servicio no arranca y en **Logs** dice qué falta: es a propósito, para que el panel nunca quede con una contraseña por defecto ni se puedan agendar citas sin pagar. En unos minutos tendrás una URL tipo `https://tata-barber.onrender.com`.
+5. Dale **Deploy**. Si falta `ADMIN_PASS` (mínimo 8 caracteres) o `MP_ACCESS_TOKEN`, el servicio no arranca y en **Logs** dice qué falta: es a propósito, para que el panel nunca quede con una contraseña por defecto ni se puedan agendar citas sin pagar. En unos minutos tendrás una URL tipo `https://style-cuts.onrender.com`.
 
 ## Paso 5 — Conecta el webhook de Mercado Pago (importante)
 Esto confirma el pago aunque el cliente cierre el navegador.
@@ -53,10 +53,10 @@ Esto confirma el pago aunque el cliente cierre el navegador.
 4. Guarda. No necesitas pegar ningún secreto: el sistema confirma cada pago consultándolo directamente con Mercado Pago usando tu `MP_ACCESS_TOKEN`.
 
 ## Paso 6 — (Opcional) Dominio propio
-1. Compra `tatabarber.com` (Namecheap, Cloudflare, GoDaddy).
+1. Compra `stylecuts.com` (Namecheap, Cloudflare, GoDaddy).
 2. En Render → **Settings → Custom Domain**, agrégalo y sigue las instrucciones de DNS.
-3. En Render → **Environment**, agrega la variable `BASE_URL` con `https://tatabarber.com` y guarda (se redespliega solo).
-4. En Mercado Pago, cambia la URL del webhook a `https://tatabarber.com/api/mp/webhook`.
+3. En Render → **Environment**, agrega la variable `BASE_URL` con `https://stylecuts.com` y guarda (se redespliega solo).
+4. En Mercado Pago, cambia la URL del webhook a `https://stylecuts.com/api/mp/webhook`.
 
 ## Paso 7 — (Opcional) Agenda de Google: las citas en Google Calendar
 Con esto, cada cita pagada aparece sola en el Google Calendar de la barbería (con un color por barbero, el

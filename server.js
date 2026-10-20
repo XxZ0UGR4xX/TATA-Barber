@@ -712,7 +712,7 @@ app.get(`${API_PANEL}/respaldo`, requireAdmin, async (req, res, next) => {
   try {
     await db.backup(tmp);
     const { fecha, min } = ahoraMX();
-    const nombre = negocio().nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const nombre = negocio().nombre.normalize('NFD').replace(/[\u0300-\u036f'’]/g, '').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'barberia';
     res.download(tmp, `respaldo-${nombre}-${fecha}-${toHHMM(min).replace(':', '')}.db`, (err) => {
       borrar();

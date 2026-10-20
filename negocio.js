@@ -4,7 +4,7 @@
 // El dueño puede cambiar después los datos de contacto (nombre, dirección, teléfono, redes...)
 // desde el panel de administrador; lo que guarde ahí tiene prioridad sobre este archivo.
 module.exports = {
-  nombre: 'Tata Barber',               // la primera palabra se ve en blanco y el resto en dorado
+  nombre: "Style Cut's",               // la primera palabra se ve en blanco y el resto en dorado
   eslogan: 'Cortes, barba y estilo con reserva en línea.',
   direccion: 'Libra 508, La Estrella, 20150',
   ciudadEstado: 'Aguascalientes, Ags.',

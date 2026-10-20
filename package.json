@@ -1,7 +1,7 @@
 {
-  "name": "tata-barber",
+  "name": "style-cuts",
   "version": "1.0.0",
-  "description": "Sistema de citas con pago en línea para Tata Barber",
+  "description": "Sistema de citas con pago en línea para Style Cut's",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

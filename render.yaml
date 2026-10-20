@@ -3,7 +3,7 @@
 # Luego llena las variables marcadas como sync:false en el panel de Render.
 services:
   - type: web
-    name: tata-barber
+    name: style-cuts
     runtime: node
     plan: starter            # $7 USD/mes, siempre encendido. Cambia a 'free' para probar (se duerme).
     buildCommand: npm install

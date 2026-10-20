@@ -1,4 +1,4 @@
-# The Barber Co. — Sistema de citas con pago en línea
+# Style Cut's — Sistema de citas con pago en línea
 
 Página web para una barbería donde el cliente:
 
