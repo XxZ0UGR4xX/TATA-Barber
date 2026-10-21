@@ -870,13 +870,16 @@ app.listen(PORT, () => {
     const redes = Object.entries(os.networkInterfaces())
       .flatMap(([nombre, lista]) => (lista || []).map((i) => ({ nombre, ...i })))
       .filter((i) => !i.internal && (i.family === 'IPv4' || i.family === 4) && !i.address.startsWith('169.254.'))
-      .map((i) => ({ ...i, virtual: VIRTUAL.test(i.nombre) }))
-      .sort((a, b) => a.virtual - b.virtual);
+      // 192.168.137.x es la "zona con cobertura" (hotspot) de Windows: solo sirve si el celular se conecta a ella
+      .map((i) => ({ ...i, virtual: VIRTUAL.test(i.nombre), hotspot: i.address.startsWith('192.168.137.') }))
+      .sort((a, b) => (a.virtual + a.hotspot * 0.5) - (b.virtual + b.hotspot * 0.5));
     if (!redes.length) console.log('No hay red local: conecta esta computadora al Wi-Fi para probar desde el celular.');
     for (const r of redes) {
-      console.log(`En tu red [${r.nombre}${r.virtual ? ', adaptador virtual: probablemente no sirve' : ''}]: ` +
-        `http://${r.address}:${PORT}  ·  panel: http://${r.address}:${PORT}/${RUTA_PANEL}`);
+      const nota = r.virtual ? ', adaptador virtual: probablemente no sirve'
+        : r.hotspot ? ', hotspot de esta PC: solo si el celular se conecta a ese hotspot' : '';
+      console.log(`En tu red [${r.nombre}${nota}]: http://${r.address}:${PORT}  ·  panel: http://${r.address}:${PORT}/${RUTA_PANEL}`);
     }
+    if (redes.length) console.log(`¿No abre en el celular? Escribe la dirección completa con :${PORT} y revisa el Firewall de Windows (README, sección 2).`);
   }
   if (agenda.activa()) console.log(`Agenda de Google activa → ${agenda.estado().calendario}`);
 });

@@ -43,8 +43,12 @@ npm start
 **Si el celular dice "No se puede acceder" (`ERR_ADDRESS_UNREACHABLE` o `ERR_CONNECTION_TIMED_OUT`):**
 - Usa la dirección del adaptador **Wi-Fi** (casi siempre `192.168.x.x` o `10.x.x.x`). Una `169.254.x.x` es de un adaptador sin conexión y nunca funciona. En Windows la confirmas con `ipconfig` → "Adaptador de LAN inalámbrica Wi-Fi" → "Dirección IPv4".
 - El celular debe estar en **el mismo Wi-Fi**, no con datos móviles ni en la red de invitados (las redes de invitados suelen impedir que los equipos se vean entre sí).
+- Escribe la dirección **completa, con el puerto**: `http://192.168.x.x:3000`. Sin `:3000` el celular se queda esperando.
+- Prueba primero en la misma computadora con esa dirección (no con `localhost`). Si ahí abre y en el celular no, es el Firewall.
 - En Windows: **Configuración → Red e Internet → Wi-Fi → (tu red)** → perfil de red **Privada**. Con perfil "Pública", el Firewall bloquea las conexiones de otros equipos.
+- Si al primer aviso del Firewall le diste "Cancelar", Windows dejó bloqueado a Node.js: **Panel de control → Firewall de Windows Defender → Permitir una aplicación… → Cambiar la configuración** → busca **Node.js JavaScript Runtime** y marca **Privada**. (Si aparece dos veces, márcalas ambas).
 - Si tienes una VPN activa en la computadora, apágala mientras pruebas.
+- Si el módem no deja que los equipos se vean entre sí, usa la **zona con cobertura inalámbrica móvil** de Windows: actívala, conecta el celular a esa red y abre la dirección `192.168.137.1:3000` que muestra la consola.
 
 En modo demo todo funciona por la red, incluido el pago simulado. Con un token de prueba de Mercado Pago (`TEST-…`), pon además `BASE_URL=http://TU-IP:3000` en `.env`, para que Mercado Pago regrese al cliente a tu computadora después de pagar. El aviso automático de Mercado Pago (webhook) no llega a una red local; ahí el pago se confirma cuando el cliente regresa al sitio.
 
