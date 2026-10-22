@@ -15,6 +15,7 @@
   <div class="brand">{{{marcaHtml}}}</div>
   <nav class="top-nav">
     <a href="#referencias" class="solo-referencias hidden">Referencias</a>
+    <a href="#resenas" class="solo-resenas hidden">Reseñas</a>
     <a href="#tienda">Tienda</a>
   </nav>
 </div></header>
@@ -121,6 +122,20 @@
   <button type="button" class="ruleta-btn visor-next" id="visor-next" aria-label="Siguiente imagen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
 </dialog>
 
+<section class="resenas hidden" id="resenas">
+  <div class="wrap">
+    <div class="tienda-head">
+      <div>
+        <div class="eyebrow">Reseñas</div>
+        <h2>Lo que dicen nuestros clientes</h2>
+        <p class="muted">Opiniones verificadas: solo califican clientes que ya tuvieron su cita.</p>
+      </div>
+      <div class="resenas-resumen" id="resenas-resumen"></div>
+    </div>
+    <div class="resenas-track" id="resenas-track" aria-label="Reseñas de clientes"></div>
+  </div>
+</section>
+
 <section class="tienda" id="tienda">
   <div class="wrap">
     <div class="tienda-head">
@@ -212,6 +227,7 @@
         <li><a href="#top">Inicio</a></li>
         <li><a href="#reserva">Reservar cita</a></li>
         <li class="solo-referencias hidden"><a href="#referencias">Referencias</a></li>
+        <li class="solo-resenas hidden"><a href="#resenas">Reseñas</a></li>
         <li><a href="#tienda">Tienda</a></li>
         <li><a href="{{mapa}}" target="_blank" rel="noopener">Cómo llegar</a></li>
         <li><a href="privacidad.html">Aviso de privacidad</a></li>
@@ -235,6 +251,15 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); // todo dato va escapado al HTML
 const money = (n) => '$' + n + ' MXN';
 const st = { paso: 1, servicio: null, barbero: null, fecha: null, hora: null, datos: null, config: null };
+// Si llegó por el enlace de una red o por el QR (/ig, /tt, /fb, /qr), se recuerda para su cita (solo en esta pestaña)
+(() => {
+  const q = new URLSearchParams(location.search), o = q.get('origen');
+  if (o === null) return;
+  if (/^(instagram|tiktok|facebook|qr)$/.test(o)) { try { sessionStorage.setItem('origen', o); } catch {} }
+  q.delete('origen');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+})();
+const origenVisita = () => { try { return sessionStorage.getItem('origen'); } catch { return null; } };
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const fechaLarga = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 const fechaCorta = (f) => new Date(f + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -437,7 +462,7 @@ $('#btn-pagar').onclick = async () => {
   try {
     const r = await fetch('/api/reservas', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...st.datos, barberoId: st.barbero.id, servicioId: st.servicio.id, fecha: st.fecha, hora: st.hora }),
+      body: JSON.stringify({ ...st.datos, barberoId: st.barbero.id, servicioId: st.servicio.id, fecha: st.fecha, hora: st.hora, origen: origenVisita() }),
     });
     const data = await r.json();
     if (r.ok) { location.href = data.url; return; }
@@ -646,8 +671,27 @@ function carruselReferencias(imagenes) {
 })();
 
 initRuleta();
+// ---------- Reseñas verificadas (las publica el sistema cuando el cliente califica su visita) ----------
+function initResenas(r) {
+  if (!r || !r.total) return;
+  const estrellas = (n) => `<span class="estrellas-fijas" role="img" aria-label="${n} de 5 estrellas">${'★'.repeat(n)}<span class="vacia">${'★'.repeat(5 - n)}</span></span>`;
+  const mes = (m) => { const [y, mm] = String(m).split('-').map(Number); return y ? new Date(Date.UTC(y, mm - 1, 15)).toLocaleDateString('es-MX', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : ''; };
+  const total = Number(r.total);
+  $('#resenas-resumen').innerHTML = `<div class="promedio">${Number(r.promedio).toFixed(1)}</div>
+    <div>${estrellas(Math.round(Number(r.promedio)))}<div class="muted">${total} reseña${total === 1 ? '' : 's'} verificada${total === 1 ? '' : 's'}</div></div>`;
+  $('#resenas-track').innerHTML = r.ultimas.map((x) => `
+    <figure class="resena">
+      ${estrellas(Math.min(5, Math.max(1, Number(x.estrellas) || 1)))}
+      <blockquote>${esc(x.comentario)}</blockquote>
+      <figcaption><b>${esc(x.nombre)}</b> · ${esc(x.servicio)} · ${esc(mes(x.mes))}</figcaption>
+    </figure>`).join('');
+  if (!r.ultimas.length) $('#resenas-track').classList.add('hidden');
+  document.querySelectorAll('.solo-resenas').forEach((e) => e.classList.remove('hidden'));
+  $('#resenas').classList.remove('hidden');
+}
+
 init().catch(() => msg('No se pudo cargar la información. Recarga la página.'))
-  .finally(() => initReferencias(st.config?.referencias || []));
+  .finally(() => { initReferencias(st.config?.referencias || []); initResenas(st.config?.resenas); });
 </script>
 </body>
 </html>

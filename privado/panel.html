@@ -39,6 +39,8 @@
         <button class="tab on" data-tab="citas">Citas</button>
         <button class="tab" data-tab="config">Configuración</button>
         <button class="tab" data-tab="referencias">Referencias</button>
+        <button class="tab" data-tab="resenas">Reseñas</button>
+        <button class="tab" data-tab="redes">Redes y QR</button>
       </nav>
     </div>
 
@@ -92,6 +94,7 @@
           <div><label for="n-ig">Instagram (usuario)</label><input id="n-ig" name="instagram" maxlength="80" placeholder="stylecuts" /></div>
           <div><label for="n-fb">Facebook (usuario o página)</label><input id="n-fb" name="facebook" maxlength="80" /></div>
           <div><label for="n-tt">TikTok (usuario)</label><input id="n-tt" name="tiktok" maxlength="80" /></div>
+          <div><label for="n-mapa">Enlace de Google Maps (botón "Cómo llegar")</label><input id="n-mapa" name="mapaUrl" maxlength="400" placeholder="https://share.google/…" /></div>
         </div>
         <button class="btn" id="save-negocio">Guardar datos</button>
       </div>
@@ -121,6 +124,63 @@
         <h2>Respaldo</h2>
         <p class="muted">Descarga una copia completa de la base de datos: citas, clientes, barberos, servicios, horario, fotos y referencias. Guárdala en un lugar seguro, porque trae datos de tus clientes. Además, el servidor guarda una copia automática cada día.</p>
         <button class="btn ghost sm" id="btn-respaldo">Descargar respaldo</button>
+      </div>
+    </div>
+
+    <!-- Reseñas verificadas de clientes -->
+    <div id="tab-resenas" class="hidden">
+      <div class="stats" id="res-stats"></div>
+      <div class="card">
+        <h2>Reseñas recibidas</h2>
+        <p class="muted">Se publican solas en el sitio. Oculta solo las ofensivas o con datos personales: esconder las críticas engaña a tus clientes y puede considerarse publicidad engañosa.</p>
+        <div id="res-lista"></div>
+      </div>
+      <div class="card">
+        <h2>Cómo se piden</h2>
+        <p class="muted">Dos horas después de cada cita pagada, el cliente recibe un correo para calificar su visita, una sola vez. Solo pueden opinar clientes reales.</p>
+        <div id="res-correo"></div>
+        <label class="check" style="margin:12px 0 16px"><input type="checkbox" id="res-activas" /> Pedir reseña por correo después de cada cita</label>
+        <label for="res-google">Enlace para opinar en Google (opcional)</label>
+        <input id="res-google" maxlength="400" placeholder="https://share.google/… o https://g.page/r/…/review" />
+        <p class="muted nota-google">Al terminar su reseña, a todos los clientes (con cualquier calificación) se les ofrece también opinar en Google. Pedírselo solo a los contentos va contra las reglas de Google.</p>
+        <button class="btn" id="res-guardar">Guardar</button>
+      </div>
+    </div>
+
+    <!-- Redes y QR: enlaces por red, estadísticas, código QR y textos para respuestas automáticas -->
+    <div id="tab-redes" class="hidden">
+      <div class="card">
+        <h2>Código QR</h2>
+        <div class="qr-grid">
+          <img id="qr-img" alt="Código QR del sitio" width="220" height="220" />
+          <div class="qr-info">
+            <p class="muted">Para el mostrador, el espejo o tus tarjetas: al escanearlo, el cliente llega directo a agendar.</p>
+            <p>Lleva a: <b id="qr-destino"></b></p>
+            <div id="qr-aviso"></div>
+            <div class="acciones">
+              <a class="btn sm" id="qr-png" download>Descargar PNG</a>
+              <a class="btn ghost sm" id="qr-svg" download>Descargar SVG</a>
+              <a class="btn ghost sm" id="qr-cartel" target="_blank" rel="noopener">Cartel para imprimir</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Enlaces para tus redes</h2>
+        <p class="muted">Pon cada uno en el perfil de su red (campo "Sitio web" o "Enlaces"). Llevan directo a agendar y cuentan de qué red llega cada cliente.</p>
+        <div class="enlaces" id="enlaces"></div>
+      </div>
+      <div class="card">
+        <h2>De dónde llegan tus clientes <small>últimos 30 días</small></h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Canal</th><th>Visitas</th><th>Citas pagadas</th></tr></thead>
+          <tbody id="canales"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h2>Respuestas automáticas listas para pegar</h2>
+        <p class="muted">En Instagram van en "Preguntas frecuentes" y "Respuesta instantánea"; en TikTok, en "Mensaje de bienvenida" y "Preguntas sugeridas". Los pasos están en la guía REDES.md.</p>
+        <div class="textos" id="textos"></div>
       </div>
     </div>
 
@@ -240,8 +300,8 @@ $('#tbody').onclick = async (e) => {
 $('#tabs').onclick = (e) => {
   const t = e.target.closest('[data-tab]'); if (!t) return;
   document.querySelectorAll('#tabs .tab').forEach((x) => x.classList.toggle('on', x === t));
-  ['citas', 'config', 'referencias'].forEach((n) => $(`#tab-${n}`).classList.toggle('hidden', t.dataset.tab !== n));
-  ({ citas: cargarTodo, config: cargarCatalogo, referencias: cargarReferencias })[t.dataset.tab]();
+  ['citas', 'config', 'referencias', 'resenas', 'redes'].forEach((n) => $(`#tab-${n}`).classList.toggle('hidden', t.dataset.tab !== n));
+  ({ citas: cargarTodo, config: cargarCatalogo, referencias: cargarReferencias, resenas: cargarResenas, redes: cargarRedes })[t.dataset.tab]();
 };
 
 // ---------- configuración: barberos, servicios y horario ----------
@@ -413,6 +473,92 @@ $('#cfg-barberos').addEventListener('click', async (e) => {
 });
 $('#cfg-barberos').addEventListener('input', (e) => {
   if (e.target.name === 'descripcion') e.target.closest('.fila').querySelector('[data-cuenta]').textContent = `${e.target.value.length}/160`;
+});
+
+// ---------- reseñas ----------
+const estrellasTxt = (n) => `<span class="estrellas-fijas" role="img" aria-label="${n} de 5 estrellas">${'★'.repeat(n)}<span class="vacia">${'★'.repeat(5 - n)}</span></span>`;
+async function cargarResenas() {
+  const d = await (await api(API + '/resenas')).json();
+  const r = d.resumen;
+  $('#res-stats').innerHTML = `
+    <div class="stat"><div class="n">${r.promedio === null ? '—' : Number(r.promedio).toFixed(1) + ' ★'}</div><div class="l">Promedio</div></div>
+    <div class="stat"><div class="n">${Number(r.publicadas)}</div><div class="l">Publicadas</div></div>
+    <div class="stat"><div class="n">${Number(r.ocultas)}</div><div class="l">Ocultas</div></div>
+    <div class="stat"><div class="n">${Number(r.sinResponder)}</div><div class="l">Pedidas sin respuesta</div></div>`;
+  $('#res-activas').checked = d.activas;
+  $('#res-google').value = d.google || '';
+  $('#res-correo').innerHTML = d.correoConfigurado ? '' : '<div class="msg err">El correo (SMTP) no está configurado: mientras tanto no se pueden pedir reseñas.</div>';
+  $('#res-lista').innerHTML = d.resenas.length ? d.resenas.map((x) => `
+    <div class="resena-fila ${x.estado === 'oculta' ? 'oculto' : ''}">
+      <div class="rf-head">
+        ${estrellasTxt(Math.min(5, Math.max(1, Number(x.estrellas) || 1)))}
+        <b>${esc(x.nombre)}</b>
+        <span class="muted">${esc(x.cliente)} · ${esc(x.servicio)} con ${esc(x.barbero)} · ${fechaCorta(x.fecha)}</span>
+        <span class="badge ${x.estado === 'publicada' ? 'pagada' : 'cancelada'}">${x.estado === 'publicada' ? 'Publicada' : 'Oculta'}</span>
+      </div>
+      <p>${x.comentario ? esc(x.comentario) : '<i class="muted">Sin comentario</i>'}</p>
+      <button type="button" class="btn ghost sm" data-resena="${Number(x.id)}" data-estado="${x.estado === 'publicada' ? 'oculta' : 'publicada'}">${x.estado === 'publicada' ? 'Ocultar' : 'Publicar'}</button>
+    </div>`).join('') : '<p class="muted">Aún no hay reseñas. Llegarán solas cuando tus clientes califiquen su visita.</p>';
+}
+$('#res-lista').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-resena]'); if (!b) return;
+  if (b.dataset.estado === 'oculta' && !confirm('¿Ocultar esta reseña del sitio?')) return;
+  try {
+    const r = await api(`${API}/resenas/${Number(b.dataset.resena)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: b.dataset.estado }) });
+    aviso(r.ok ? (b.dataset.estado === 'oculta' ? 'Reseña oculta.' : 'Reseña publicada.') : 'No se pudo cambiar', r.ok ? 'ok' : 'err');
+    cargarResenas();
+  } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
+});
+$('#res-guardar').onclick = async () => {
+  try {
+    const r = await api(API + '/resenas-ajustes', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activas: $('#res-activas').checked, google: $('#res-google').value }) });
+    const d = await r.json().catch(() => ({}));
+    aviso(r.ok ? 'Guardado.' : d.error || 'No se pudo guardar', r.ok ? 'ok' : 'err');
+  } catch (err) { if (err.message !== 'no-auth') aviso('Error de conexión', 'err'); }
+};
+
+// ---------- redes y QR ----------
+async function copiar(texto, boton) {
+  try { await navigator.clipboard.writeText(texto); }
+  catch { // sin https (p. ej. probando por la red local) el portapapeles moderno no está disponible
+    const t = document.createElement('textarea'); t.value = texto; document.body.append(t); t.select(); document.execCommand('copy'); t.remove();
+  }
+  const antes = boton.textContent; boton.textContent = 'Copiado ✓'; setTimeout(() => { boton.textContent = antes; }, 1500);
+}
+let textosRedes = [];
+async function cargarRedes() {
+  const d = await (await api(API + '/difusion')).json();
+  $('#qr-img').src = `${API}/qr.svg?v=${encodeURIComponent(d.destinoQr)}`;
+  $('#qr-destino').textContent = d.destinoQr;
+  $('#qr-png').href = API + '/qr.png';
+  $('#qr-svg').href = API + '/qr.svg?descargar=1';
+  $('#qr-cartel').href = API + '/cartel';
+  $('#qr-aviso').innerHTML = d.dominioFinal ? ''
+    : '<div class="msg err">Este QR apunta a una dirección provisional. Imprímelo cuando el sitio tenga su dominio definitivo, para que los carteles sigan sirviendo.</div>';
+  const NOMBRES = { instagram: 'Instagram', tiktok: 'TikTok', facebook: 'Facebook' };
+  $('#enlaces').innerHTML = Object.entries(d.enlaces).map(([c, url]) => `
+    <div class="enlace-fila"><b>${NOMBRES[c] || esc(c)}</b><code>${esc(url)}</code><button type="button" class="btn ghost sm" data-copiar="${esc(url)}">Copiar</button></div>`).join('');
+  $('#canales').innerHTML = d.estadisticas.map((s) => `<tr><td>${esc(s.nombre)}</td><td>${Number(s.visitas)}</td><td>${Number(s.citas)}</td></tr>`).join('');
+  const n = d.negocio, ig = d.enlaces.instagram, ciudad = String(n.ciudadEstado).split(',')[0];
+  const tel = n.telefono ? ` Tel. ${n.telefono}.` : '';
+  textosRedes = [
+    ['Instagram · Respuesta instantánea (bienvenida)', `¡Hola! Gracias por escribir a ${n.nombre} 💈 Agenda y paga tu cita en menos de un minuto aquí: ${ig} Si prefieres, déjanos tu mensaje y te respondemos en breve.`],
+    ['Instagram · Pregunta frecuente: 📅 Quiero agendar una cita', `¡Claro! Elige servicio, barbero, día y hora, y paga en línea aquí: ${ig}`],
+    ['Instagram · Pregunta frecuente: 💬 Quiero hablar con un barbero', `¡Con gusto! Cuéntanos qué necesitas y en un momento te atendemos. Si quieres apartar tu lugar de una vez: ${ig}`],
+    ['Instagram · Pregunta frecuente: 💲 Precios y servicios', `Todos nuestros servicios y precios están aquí, y desde ahí mismo agendas: ${ig}`],
+    ['Instagram · Pregunta frecuente: 📍 ¿Dónde están?', `Estamos en ${n.direccion}, ${String(n.ciudadEstado).replace(/\.$/, '')}.${tel} Agenda tu cita aquí: ${ig}`],
+    ['TikTok · Mensaje de bienvenida (máx. 250)', `¡Hola! Gracias por escribir a ${n.nombre} 💈 Para agendar tu cita toca el enlace de nuestro perfil: eliges servicio, barbero, día y hora y pagas en línea.`],
+    ['TikTok · Pregunta sugerida: 📅 ¿Cómo agendo una cita?', 'Toca el enlace de nuestro perfil: eliges servicio, barbero, día y hora y pagas en línea. ¡Listo en un minuto!'],
+    ['Biografía (Instagram y TikTok)', `💈 Barbería en ${ciudad} · Cortes, barba y faciales\n📅 Agenda y paga tu cita aquí 👇`],
+  ];
+  $('#textos').innerHTML = textosRedes.map(([t, txt], i) => `
+    <div class="texto-red"><div class="tr-head"><b>${esc(t)}</b><span class="muted">${txt.length} caracteres</span>
+      <button type="button" class="btn ghost sm" data-texto="${i}">Copiar</button></div>
+      <p>${esc(txt).replace(/\n/g, '<br>')}</p></div>`).join('');
+}
+$('#tab-redes').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-copiar], [data-texto]'); if (!b) return;
+  copiar(b.dataset.copiar ?? textosRedes[Number(b.dataset.texto)][1], b);
 });
 
 // ---------- respaldo ----------

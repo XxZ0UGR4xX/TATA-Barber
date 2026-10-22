@@ -151,6 +151,25 @@ async function recordatorioCliente(cita, n) {
   });
 }
 
+// Después de la cita: invitación a calificar la visita (enlace único, sirve una sola vez)
+async function pedirResena(cita, n, url) {
+  const p = pie(n);
+  const lugar = n?.nombre || 'la barbería';
+  const visita = `${cita.servicio_nombre} con ${cita.barbero_nombre}`;
+  await enviar({
+    to: cita.cliente_email,
+    subject: `¿Cómo te fue en ${lugar}?`,
+    text: `Hola ${cita.cliente_nombre}, gracias por tu visita (${visita}).\n\n` +
+      `¿Nos cuentas cómo te fue? Califica tu visita en menos de un minuto:\n${url}\n\n` +
+      'Tu opinión nos ayuda a mejorar y a que otros clientes nos conozcan.' + p.text,
+    html: `<h2 style="font-family:Arial,sans-serif">Hola ${esc(cita.cliente_nombre)}, ¿cómo te fue?</h2>
+           <p style="font-family:Arial,sans-serif">Gracias por tu visita: ${esc(visita)}.</p>
+           <p style="font-family:Arial,sans-serif;color:#666">Califica tu visita en menos de un minuto. Tu opinión nos ayuda a mejorar
+           y a que otros clientes nos conozcan.</p>
+           ${botonAgenda(url, 'Calificar mi visita ★')}${p.html}`,
+  });
+}
+
 const configurado = () => !!getTransporter();
 
-module.exports = { avisarBarberia, confirmarCliente, avisarConflicto, conflictoCliente, recordatorioCliente, configurado };
+module.exports = { avisarBarberia, confirmarCliente, avisarConflicto, conflictoCliente, recordatorioCliente, pedirResena, configurado };

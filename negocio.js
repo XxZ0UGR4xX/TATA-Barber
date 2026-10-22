@@ -8,12 +8,16 @@ module.exports = {
   eslogan: 'Cortes, barba y estilo con reserva en línea.',
   direccion: 'Libra 508, La Estrella, 20150',
   ciudadEstado: 'Aguascalientes, Ags.',
-  telefono: '449 224 9214',            // 10 dígitos
-  whatsapp: '449 224 9214',            // vacío si no tienen WhatsApp
+  telefono: '449 902 5586',            // 10 dígitos
+  whatsapp: '449 902 5586',            // vacío si no tienen WhatsApp
   correo: '',                          // correo público de contacto (vacío = no se muestra)
   instagram: '',                       // solo el usuario, sin @ (vacío = no se muestra)
   facebook: '',
   tiktok: '',
+  // Ficha de la barbería en Google Maps: el botón "Cómo llegar" la abre (vacío = búsqueda por dirección)
+  mapaUrl: 'https://share.google/4c1gxY18Wdpzxw9p0',
+  // Enlace para opinar en Google; se ofrece a todos los clientes después de su reseña (vacío = no se ofrece)
+  googleResenas: 'https://share.google/4c1gxY18Wdpzxw9p0',
 
   // Solo se cambian aquí (no desde el panel)
   colores: {

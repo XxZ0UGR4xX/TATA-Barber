@@ -97,6 +97,10 @@ archivo, por ejemplo `GOOGLE_CREDENCIALES=./agenda-citas.json` (no lo subas a Gi
    puedes descargar una copia completa cuando quieras.
 3. Qué revisar cuando algo falla: **`SOPORTE.md`**.
 
+## Paso 9 — Redes, código QR y reseñas
+Con el dominio definitivo ya conectado: panel → **Redes y QR**. Pon los enlaces en Instagram y TikTok,
+pega las respuestas automáticas e imprime el cartel con el QR. Pasos completos en **`REDES.md`**.
+
 ---
 
 ## Probar antes de cobrar real

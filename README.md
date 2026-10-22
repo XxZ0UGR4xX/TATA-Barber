@@ -92,6 +92,12 @@ Usa una **contraseña de aplicación** (no tu contraseña normal): activa la ver
 
 - **Aviso de privacidad:** `public/privacidad.html` toma el nombre, dirección y contacto de la configuración. Es un modelo: conviene que lo revise un abogado antes de publicar.
 
+### Redes sociales, código QR y reseñas
+- **Enlaces por red:** `/ig`, `/tt`, `/fb` y `/qr` llevan directo a reservar; el panel (**Redes y QR**) muestra cuántas visitas y citas pagadas llegan de cada una y trae los textos listos para las respuestas automáticas de Instagram y TikTok.
+- **Código QR:** en el mismo panel, PNG de 2048 px, SVG y un **cartel para imprimir**. Apunta a `/qr` del dominio configurado.
+- **Reseñas verificadas:** 2 horas después de cada cita pagada se pide una calificación por correo (un enlace único por cita); se publican en el sitio y se administran en el panel (**Reseñas**).
+- Guía completa: **`REDES.md`**.
+
 ### Agenda de Google (Google Calendar)
 Con `GOOGLE_CALENDAR_ID` y `GOOGLE_CREDENCIALES` configurados, cada cita pagada **aparece sola** en el calendario de la barbería (título con barbero, servicio y cliente; un color por barbero; teléfono y código en la descripción) y **se quita** si se cancela en el panel. Si Google no responde, se reintenta cada 10 minutos sin duplicar. Sin configurarla, el correo de cada cita nueva trae el botón **"Agregar a Google Calendar"**. El correo de confirmación al cliente siempre trae **"Agregar a mi Google Calendar"**.
 
@@ -113,8 +119,11 @@ negocio.js       Datos de la barbería: nombre, contacto, colores, banner
 mail.js          Envío de correos (barbería + cliente)
 agenda.js        Agenda de Google: citas pagadas a Google Calendar (opcional)
 SOPORTE.md       Guía para dar soporte: monitoreo, respaldos y problemas comunes
+REDES.md         Instagram, TikTok, Facebook, código QR y reseñas
 privado/
   panel.html     Panel del administrador (solo se sirve en la ruta secreta)
+  cartel.html    Cartel con el código QR para imprimir
+  resena.html    Página donde el cliente califica su visita
 public/
   index.html     Reserva paso a paso (servicio → barbero → día/hora → datos → pago)
   pago-demo.html Pasarela simulada (solo en modo demo)
@@ -133,6 +142,7 @@ public/
 - **Sesión del panel:** la cookie solo lleva una llave aleatoria de 256 bits, sin datos dentro; en la base se guarda únicamente su huella SHA-256. Es `HttpOnly`, `SameSite=Strict` y, con HTTPS, `Secure` con prefijo `__Host-`. Cerrar sesión la invalida en el servidor; cambiar `ADMIN_PASS` o `SESSION_SECRET` cierra todas las sesiones; máximo 5 sesiones abiertas.
 - **Panel oculto:** sin botones en el sitio; vive en una ruta secreta (`PANEL_RUTA`) y su API también (`/api/<ruta>/…`). `/admin.html` y `/api/admin/…` no existen. La página del panel no se indexa en buscadores y no envía la dirección como *referer*. Es una capa extra: la protección real es la contraseña, la sesión y el límite de intentos.
 - **Fotos de barberos:** solo se suben con sesión del panel; se aceptan JPG, PNG o WebP reconocidos por su contenido (no SVG), de máximo 1 MB. El panel las vuelve a dibujar antes de subirlas, lo que les quita los datos ocultos de la cámara (como la ubicación GPS). Se entregan como imagen con `nosniff` y `sandbox`: un archivo disfrazado no puede ejecutar código.
+- **Reseñas:** solo las deja quien pagó una cita, con un enlace único que sirve una vez; en la base se guarda solo su huella SHA-256. La página no se indexa ni envía la dirección como *referer*, y el texto se limpia y se muestra escapado.
 - **Agenda de Google:** la cuenta de servicio solo pide permiso de *eventos de calendario* y solo puede tocar el calendario que el dueño le compartió. La llave se lee de una variable de entorno y nunca se muestra en la consola (ni en los mensajes de error).
 - **APIs encapsuladas:** las acciones (POST/PUT) solo se aceptan desde el propio sitio (`Origin` / `Sec-Fetch-Site`); sin CORS, otro sitio no puede leer las respuestas; los datos privados van con `Cache-Control: no-store`; la API pública solo devuelve lo necesario; rutas inexistentes responden un 404 neutro.
 - **Límites:** 300 consultas a la API cada 5 min por IP; 6 reservas cada 15 min por IP y 2 horarios apartados sin pagar por teléfono; 5 intentos de login cada 15 min; reservas hasta 60 días adelante.

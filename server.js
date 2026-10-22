@@ -8,6 +8,7 @@ const path = require('path');
 const db = require('./db');
 const mail = require('./mail');
 const agenda = require('./agenda');
+const QRCode = require('qrcode');
 const NEGOCIO_BASE = require('./negocio');
 
 const PORT = process.env.PORT || 3000;
@@ -80,7 +81,7 @@ if (PASS_EJEMPLO.includes(ADMIN_PASS)) {
 
 // ---------- datos del negocio ----------
 // negocio.js trae los valores de instalación; lo que el dueño guarda en el panel (tabla ajustes) los reemplaza.
-const CAMPOS_NEGOCIO = ['nombre', 'eslogan', 'direccion', 'ciudadEstado', 'telefono', 'whatsapp', 'correo', 'instagram', 'facebook', 'tiktok'];
+const CAMPOS_NEGOCIO = ['nombre', 'eslogan', 'direccion', 'ciudadEstado', 'telefono', 'whatsapp', 'correo', 'instagram', 'facebook', 'tiktok', 'mapaUrl'];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const diezDigitos = (s) => String(s ?? '').replace(/\D/g, '').slice(-10);
 const COLOR = /^#[0-9a-f]{3,8}$/i;
@@ -101,7 +102,7 @@ function negocio() {
     telLink: tel.length === 10 ? `+52${tel}` : '',
     waNumero: wa.length === 10 ? `52${wa}` : '',
     waLink: wa.length === 10 ? `https://wa.me/52${wa}` : '',
-    mapa: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${n.direccion}, ${n.ciudadEstado}`),
+    mapa: n.mapaUrl || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(`${n.direccion}, ${n.ciudadEstado}`),
     instagramUrl: n.instagram ? `https://www.instagram.com/${encodeURIComponent(n.instagram)}` : '',
     facebookUrl: n.facebook ? `https://www.facebook.com/${encodeURIComponent(n.facebook)}` : '',
     tiktokUrl: n.tiktok ? `https://www.tiktok.com/@${encodeURIComponent(n.tiktok)}` : '',
@@ -205,6 +206,60 @@ app.get('/salud', (req, res) => {
     res.status(503).json({ ok: false });
   }
 });
+// ---------- enlaces por red: /ig, /tt, /fb, /qr ----------
+// Llevan directo a reservar y cuentan una visita por persona, canal y día (en memoria, sin cookies).
+// La cita guarda de qué red llegó, para ver en el panel qué red trae clientes.
+const CANALES = { ig: 'instagram', tt: 'tiktok', fb: 'facebook', qr: 'qr' };
+const NOMBRE_CANAL = { instagram: 'Instagram', tiktok: 'TikTok', facebook: 'Facebook', qr: 'Código QR' };
+let vistos = { dia: '', set: new Set() };
+for (const [corto, canal] of Object.entries(CANALES)) {
+  app.get(`/${corto}`, (req, res) => {
+    const dia = ahoraMX().fecha;
+    if (vistos.dia !== dia) vistos = { dia, set: new Set() };
+    const llave = `${canal}|${req.ip}`;
+    if (!vistos.set.has(llave) && vistos.set.size < 100000) {
+      vistos.set.add(llave);
+      db.prepare('INSERT INTO visitas (canal, fecha, n) VALUES (?, ?, 1) ON CONFLICT(canal, fecha) DO UPDATE SET n = n + 1')
+        .run(canal, dia);
+    }
+    res.set('Cache-Control', 'no-store').redirect(302, `/?origen=${canal}#reserva`);
+  });
+}
+
+// ---------- reseñas verificadas: página para calificar ----------
+// El enlace llega por correo solo a quien pagó su cita; en la base se guarda únicamente su huella
+const TOKEN_RESENA = /^[A-Za-z0-9_-]{43}$/;
+const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+const ajuste = (clave, defecto) => db.prepare('SELECT valor FROM ajustes WHERE clave = ?').get(clave)?.valor ?? defecto;
+const guardarAjuste = (clave, valor) => db.prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor').run(clave, valor);
+const resenasActivas = () => ajuste('resenasActivas', '1') === '1';
+const enlaceGoogle = () => ajuste('googleResenas', NEGOCIO_BASE.googleResenas || '');
+// "Ana López Ruiz" → "Ana L."
+const nombreCorto = (n) => { const [a, b] = String(n).trim().split(/\s+/); return b ? `${a} ${b[0].toUpperCase()}.` : a || ''; };
+function resenaPorToken(token) {
+  if (!TOKEN_RESENA.test(String(token))) return null;
+  return db.prepare(`SELECT r.*, c.cliente_nombre, c.fecha, c.hora, s.nombre AS servicio, b.nombre AS barbero
+    FROM resenas r JOIN citas c ON c.id = r.cita_id JOIN servicios s ON s.id = c.servicio_id JOIN barberos b ON b.id = c.barbero_id
+    WHERE r.token_hash = ?`).get(hashToken(token));
+}
+const RESENA_HTML = fs.readFileSync(path.join(__dirname, 'privado', 'resena.html'), 'utf8');
+app.get('/resena/:token', (req, res, next) => {
+  const r = resenaPorToken(req.params.token);
+  if (!r) return next();
+  const nonce = crypto.randomBytes(16).toString('base64');
+  const [y, m, d] = r.fecha.split('-').map(Number);
+  const dia = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  res.type('html').set({
+    'Cache-Control': 'no-store', 'Content-Security-Policy': politica(nonce),
+    'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer', // el enlace no se filtra a otros sitios
+  }).send(plantilla(RESENA_HTML, {
+    ...datosPagina(), nonce, token: req.params.token,
+    pendiente: r.estado === 'pedida' ? '1' : '', contestada: r.estado !== 'pedida' ? '1' : '',
+    servicio: r.servicio, barbero: r.barbero, diaCita: dia, nombreSugerido: nombreCorto(r.cliente_nombre),
+    google: enlaceGoogle(),
+  }));
+});
+
 const PANEL_HTML = fs.readFileSync(path.join(__dirname, 'privado', 'panel.html'), 'utf8');
 app.get(`/${RUTA_PANEL}`, (req, res) => {
   const nonce = crypto.randomBytes(16).toString('base64');
@@ -382,12 +437,39 @@ function leerImagen(req) {
   return { tipo, version: crypto.createHash('sha256').update(req.body).digest('hex').slice(0, 12) };
 }
 
+// Reseñas publicadas para el sitio: promedio, total y las 12 más recientes con comentario
+function resenasPublicas() {
+  const t = db.prepare("SELECT COUNT(*) AS n, AVG(estrellas) AS p FROM resenas WHERE estado = 'publicada'").get();
+  const ultimas = db.prepare(`SELECT r.estrellas, r.comentario, r.nombre, substr(r.respondida_en, 1, 7) AS mes, s.nombre AS servicio
+    FROM resenas r JOIN citas c ON c.id = r.cita_id JOIN servicios s ON s.id = c.servicio_id
+    WHERE r.estado = 'publicada' AND r.comentario != '' ORDER BY r.respondida_en DESC, r.id DESC LIMIT 12`).all();
+  return { total: t.n, promedio: t.n ? Math.round(t.p * 10) / 10 : null, ultimas };
+}
+
+// Reseña enviada por el cliente (una sola vez, con el enlace de su correo)
+app.post('/api/resenas/:token', (req, res) => {
+  const r = resenaPorToken(req.params.token);
+  if (!r) return res.status(404).json({ error: 'Este enlace no es válido.' });
+  if (r.estado !== 'pedida') return res.status(409).json({ error: 'Esta reseña ya se envió. ¡Gracias!' });
+  const estrellas = Number(req.body?.estrellas);
+  if (!Number.isInteger(estrellas) || estrellas < 1 || estrellas > 5) return res.status(400).json({ error: 'Elige de 1 a 5 estrellas.' });
+  const limpio = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  const comentario = limpio(req.body?.comentario, 500);
+  const nombre = limpio(req.body?.nombre, 40) || nombreCorto(r.cliente_nombre);
+  const ok = db.prepare(`UPDATE resenas SET estrellas = ?, comentario = ?, nombre = ?, estado = 'publicada', respondida_en = datetime('now')
+    WHERE id = ? AND estado = 'pedida'`).run(estrellas, comentario, nombre, r.id).changes === 1;
+  if (!ok) return res.status(409).json({ error: 'Esta reseña ya se envió. ¡Gracias!' });
+  // El enlace a Google se ofrece a todos por igual, con cualquier calificación (Google no permite pedirlo solo a los contentos)
+  res.json({ ok: true, google: enlaceGoogle() || null });
+});
+
 // ---------- API pública ----------
 app.get('/api/config', (req, res) => {
   const h = horario();
   res.json({
     barberos: db.prepare(`${SQL_BARBEROS} WHERE b.activo = 1 ORDER BY b.id`).all().map(conFoto).map(({ activo, ...b }) => b),
     referencias: db.prepare(SQL_REFERENCIAS).all(),
+    resenas: resenasPublicas(),
     servicios: db.prepare('SELECT id, nombre, descripcion, precio, duracion FROM servicios WHERE activo = 1').all(),
     diasCerrados: Object.keys(h).filter((d) => !h[d]).map(Number),
     horario: h,
@@ -426,6 +508,7 @@ const CORREO = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/;
 app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas seguidas. Espera unos minutos e intenta de nuevo.'), async (req, res) => {
   try {
     const { nombre, email, telefono, barberoId, servicioId, fecha, hora } = req.body || {};
+    const origen = Object.values(CANALES).includes(req.body?.origen) ? req.body.origen : null;
     // Sin caracteres de control ni < >: el nombre viaja a correos, a Mercado Pago y al panel
     const n = String(nombre || '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
     const e = String(email || '').trim().toLowerCase();
@@ -452,8 +535,8 @@ app.post('/api/reservas', limitePorIp(6, 15 * 60 * 1000, 'Demasiadas reservas se
       const libre = slotsDelDia(barbero.id, fecha, servicio.duracion).find((s) => s.hora === hora);
       if (!libre || !libre.disponible) return null;
       const info = db.prepare(`INSERT INTO citas
-        (codigo, cliente_nombre, cliente_email, cliente_tel, barbero_id, servicio_id, fecha, hora, duracion, precio)
-        VALUES (?,?,?,?,?,?,?,?,?,?)`).run(codigo, n, e, t, barbero.id, servicio.id, fecha, hora, servicio.duracion, servicio.precio);
+        (codigo, cliente_nombre, cliente_email, cliente_tel, barbero_id, servicio_id, fecha, hora, duracion, precio, origen)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(codigo, n, e, t, barbero.id, servicio.id, fecha, hora, servicio.duracion, servicio.precio, origen);
       return info.lastInsertRowid;
     });
     const citaId = crear();
@@ -670,8 +753,9 @@ app.put(`${API_PANEL}/negocio`, requireAdmin, (req, res) => {
     nombre: texto(b.nombre, 40), eslogan: texto(b.eslogan, 120),
     direccion: texto(b.direccion, 100), ciudadEstado: texto(b.ciudadEstado, 60),
     telefono: texto(b.telefono, 20), whatsapp: texto(b.whatsapp, 20), correo: texto(b.correo, 80).toLowerCase(),
-    instagram: red(b.instagram), facebook: red(b.facebook), tiktok: red(b.tiktok),
+    instagram: red(b.instagram), facebook: red(b.facebook), tiktok: red(b.tiktok), mapaUrl: urlGoogle(b.mapaUrl),
   };
+  if (v.mapaUrl === null) return res.status(400).json({ error: 'El enlace de Google Maps debe empezar con https:// y ser de Google (share.google, maps.app.goo.gl o google.com).' });
   if (v.nombre.length < 2) return res.status(400).json({ error: 'Escribe el nombre de la barbería' });
   if (!v.direccion || !v.ciudadEstado) return res.status(400).json({ error: 'Escribe la dirección y la ciudad' });
   for (const k of ['telefono', 'whatsapp']) {
@@ -708,6 +792,88 @@ app.delete(`${API_PANEL}/barberos/:id/foto`, requireAdmin, (req, res) => {
   res.json({ ok: db.prepare('DELETE FROM fotos_barberos WHERE barbero_id = ?').run(id).changes === 1 });
 });
 
+// "Style Cut's" → "style-cuts" (para nombres de archivo)
+const slugNegocio = () => negocio().nombre.normalize('NFD').replace(/[\u0300-\u036f'’]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'barberia';
+
+// ---------- admin: redes y código QR ----------
+const destinoQr = () => `${BASE_URL}/qr`;
+// El QR solo debe imprimirse con el dominio definitivo (https y que no sea la dirección temporal de Render)
+const dominioFinal = () => BASE_URL.startsWith('https://') && !/onrender\.com|localhost|127\.0\.0\.1/.test(BASE_URL);
+const qrSvg = () => QRCode.toString(destinoQr(), { type: 'svg', margin: 2, errorCorrectionLevel: 'M', color: { dark: '#0e0d0b', light: '#ffffff' } });
+
+app.get(`${API_PANEL}/difusion`, requireAdmin, (req, res) => {
+  const desde = new Date(Date.parse(ahoraMX().fecha + 'T12:00:00Z') - 29 * 86400000).toISOString().slice(0, 10);
+  const visitas = Object.fromEntries(db.prepare('SELECT canal, SUM(n) AS n FROM visitas WHERE fecha >= ? GROUP BY canal').all(desde).map((r) => [r.canal, r.n]));
+  const citas = Object.fromEntries(db.prepare(`SELECT origen, COUNT(*) AS n FROM citas
+    WHERE estado = 'pagada' AND origen IS NOT NULL AND creada_en >= ? GROUP BY origen`).all(desde).map((r) => [r.origen, r.n]));
+  const n = negocio();
+  res.json({
+    url: BASE_URL, destinoQr: destinoQr(), dominioFinal: dominioFinal(),
+    enlaces: Object.fromEntries(Object.entries(CANALES).filter(([, c]) => c !== 'qr').map(([corto, c]) => [c, `${BASE_URL}/${corto}`])),
+    estadisticas: Object.values(CANALES).map((c) => ({ canal: c, nombre: NOMBRE_CANAL[c], visitas: visitas[c] || 0, citas: citas[c] || 0 })),
+    negocio: { nombre: n.nombre, direccion: n.direccion, ciudadEstado: n.ciudadEstado, telefono: n.telefono },
+  });
+});
+app.get(`${API_PANEL}/qr.svg`, requireAdmin, async (req, res, next) => {
+  try {
+    res.set({ 'Content-Type': 'image/svg+xml', 'Content-Security-Policy': "default-src 'none'; sandbox" });
+    if (req.query.descargar) res.attachment(`qr-${slugNegocio()}.svg`);
+    res.send(await qrSvg());
+  } catch (e) { next(e); }
+});
+app.get(`${API_PANEL}/qr.png`, requireAdmin, async (req, res, next) => {
+  try {
+    const png = await QRCode.toBuffer(destinoQr(), { type: 'png', width: 2048, margin: 2, errorCorrectionLevel: 'M' });
+    res.attachment(`qr-${slugNegocio()}.png`).type('png').send(png);
+  } catch (e) { next(e); }
+});
+// Cartel para imprimir (o guardar en PDF) con el QR, para el mostrador o el espejo
+const CARTEL_HTML = fs.readFileSync(path.join(__dirname, 'privado', 'cartel.html'), 'utf8');
+app.get(`${API_PANEL}/cartel`, requireAdmin, async (req, res, next) => {
+  try {
+    const nonce = crypto.randomBytes(16).toString('base64');
+    res.type('html').set({ 'Content-Security-Policy': politica(nonce), 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' })
+      .send(plantilla(CARTEL_HTML, { ...datosPagina(), nonce, qr: await qrSvg(), dominio: BASE_URL.replace(/^https?:\/\//, ''), provisional: dominioFinal() ? '' : '1' }));
+  } catch (e) { next(e); }
+});
+
+// ---------- admin: reseñas ----------
+app.get(`${API_PANEL}/resenas`, requireAdmin, (req, res) => {
+  const t = db.prepare(`SELECT
+      SUM(estado = 'publicada') AS publicadas, SUM(estado = 'oculta') AS ocultas, SUM(estado = 'pedida') AS sinResponder,
+      AVG(CASE WHEN estado = 'publicada' THEN estrellas END) AS promedio FROM resenas`).get();
+  res.json({
+    activas: resenasActivas(), google: enlaceGoogle(), correoConfigurado: mail.configurado(),
+    resumen: { publicadas: t.publicadas || 0, ocultas: t.ocultas || 0, sinResponder: t.sinResponder || 0, promedio: t.promedio ? Math.round(t.promedio * 10) / 10 : null },
+    resenas: db.prepare(`SELECT r.id, r.estrellas, r.comentario, r.nombre, r.estado, r.respondida_en,
+        c.cliente_nombre AS cliente, c.fecha, c.hora, s.nombre AS servicio, b.nombre AS barbero
+      FROM resenas r JOIN citas c ON c.id = r.cita_id JOIN servicios s ON s.id = c.servicio_id JOIN barberos b ON b.id = c.barbero_id
+      WHERE r.estado != 'pedida' ORDER BY r.respondida_en DESC, r.id DESC LIMIT 300`).all(),
+  });
+});
+app.put(`${API_PANEL}/resenas/:id`, requireAdmin, (req, res) => {
+  const id = idValido(req.params.id); if (!id) return res.status(404).json({ error: 'No encontrado' });
+  const estado = req.body?.estado;
+  if (!['publicada', 'oculta'].includes(estado)) return res.status(400).json({ error: 'Estado inválido' });
+  res.json({ ok: db.prepare("UPDATE resenas SET estado = ? WHERE id = ? AND estado != 'pedida'").run(estado, id).changes === 1 });
+});
+// Enlaces de Google (Maps y reseñas): solo direcciones https de Google
+function urlGoogle(v) {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  let u; try { u = new URL(s); } catch { return null; }
+  if (u.protocol !== 'https:' || !/(^|\.)(google\.com|google\.com\.mx|g\.page|goo\.gl|g\.co|share\.google)$/i.test(u.hostname)) return null;
+  return u.toString().slice(0, 400);
+}
+app.put(`${API_PANEL}/resenas-ajustes`, requireAdmin, (req, res) => {
+  const google = urlGoogle(req.body?.google);
+  if (google === null) return res.status(400).json({ error: 'El enlace de Google debe empezar con https:// y ser de Google (share.google, g.page, google.com o maps.app.goo.gl).' });
+  guardarAjuste('resenasActivas', req.body?.activas === false ? '0' : '1');
+  guardarAjuste('googleResenas', google);
+  res.json({ ok: true });
+});
+
 // ---------- admin: respaldo de la base de datos ----------
 // Copia completa y consistente (citas, clientes, configuración y fotos), hecha con la base funcionando
 app.get(`${API_PANEL}/respaldo`, requireAdmin, async (req, res, next) => {
@@ -716,8 +882,7 @@ app.get(`${API_PANEL}/respaldo`, requireAdmin, async (req, res, next) => {
   try {
     await db.backup(tmp);
     const { fecha, min } = ahoraMX();
-    const nombre = negocio().nombre.normalize('NFD').replace(/[\u0300-\u036f'’]/g, '').toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'barberia';
+    const nombre = slugNegocio();
     res.download(tmp, `respaldo-${nombre}-${fecha}-${toHHMM(min).replace(':', '')}.db`, (err) => {
       borrar();
       if (err && !res.headersSent) next(err);
@@ -846,6 +1011,33 @@ async function enviarRecordatorios() {
 const revisarRecordatorios = () => enviarRecordatorios().catch((e) => console.error('[recordatorios]', e.message));
 setTimeout(revisarRecordatorios, 30 * 1000);
 setInterval(revisarRecordatorios, 10 * 60 * 1000);
+
+// ---------- reseñas: se piden por correo 2 horas después de que termina la cita ----------
+// Una sola vez por cita pagada, a todos los clientes por igual y solo de citas de los últimos 3 días.
+async function pedirResenas() {
+  if (!mail.configurado() || !resenasActivas()) return;
+  const ahora = new Date();
+  const hace2h = fechaHoraMX(new Date(ahora - 2 * 3600 * 1000)), hace3d = fechaHoraMX(new Date(ahora - 3 * 86400 * 1000));
+  const candidatas = db.prepare(`SELECT id, fecha, hora, duracion FROM citas
+    WHERE estado = 'pagada' AND resena_pedida_en IS NULL AND (fecha || ' ' || hora) >= ? AND (fecha || ' ' || hora) <= ?`)
+    .all(hace3d, fechaHoraMX(ahora));
+  for (const c of candidatas) {
+    const fin = `${c.fecha} ${toHHMM(Math.min(toMin(c.hora) + c.duracion, 24 * 60 - 1))}`;
+    if (fin > hace2h) continue; // todavía no pasan 2 horas desde que terminó
+    const token = crypto.randomBytes(32).toString('base64url');
+    const marcada = db.transaction(() => {
+      if (db.prepare("UPDATE citas SET resena_pedida_en = datetime('now') WHERE id = ? AND resena_pedida_en IS NULL").run(c.id).changes !== 1) return false;
+      db.prepare('INSERT INTO resenas (cita_id, token_hash) VALUES (?, ?)').run(c.id, hashToken(token));
+      return true;
+    })();
+    if (!marcada) continue;
+    const cita = citaCompleta('c.id = ?', c.id);
+    await mail.pedirResena(cita, negocio(), `${BASE_URL}/resena/${token}`).catch((e) => console.error('[reseña]', cita.codigo, e.message));
+  }
+}
+const revisarResenas = () => pedirResenas().catch((e) => console.error('[reseñas]', e.message));
+setTimeout(revisarResenas, 40 * 1000);
+setInterval(revisarResenas, 10 * 60 * 1000);
 
 // Rutas que no existen: respuesta neutra, sin revelar con qué está hecho el servidor
 app.use('/api', (req, res) => res.status(404).json({ error: 'No encontrado' }));

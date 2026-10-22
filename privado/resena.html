@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Califica tu visita · {{nombre}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/styles.css" />
+<style>:root { --gold: {{acento}}; --gold-light: {{acentoClaro}}; --gold-dark: {{acentoOscuro}}; }</style>
+</head>
+<body>
+<header class="top"><div class="wrap"><a class="brand" href="/" style="color:inherit;text-decoration:none">{{{marcaHtml}}}</a></div></header>
+<main class="wrap" style="max-width:560px">
+  {{#pendiente}}
+  <section class="card resena-form" id="formulario" style="margin-top:40px">
+    <div class="eyebrow">Tu opinión</div>
+    <h1 class="resena-titulo">¿Cómo te fue?</h1>
+    <p class="muted">{{servicio}} con {{barbero}} · {{diaCita}}</p>
+    <form id="form-resena" novalidate>
+      <fieldset class="estrellas" id="estrellas">
+        <legend>Calificación</legend>
+        <label><input type="radio" name="estrellas" value="1" aria-label="1 estrella" /><span aria-hidden="true">★</span></label>
+        <label><input type="radio" name="estrellas" value="2" aria-label="2 estrellas" /><span aria-hidden="true">★</span></label>
+        <label><input type="radio" name="estrellas" value="3" aria-label="3 estrellas" /><span aria-hidden="true">★</span></label>
+        <label><input type="radio" name="estrellas" value="4" aria-label="4 estrellas" /><span aria-hidden="true">★</span></label>
+        <label><input type="radio" name="estrellas" value="5" aria-label="5 estrellas" /><span aria-hidden="true">★</span></label>
+      </fieldset>
+      <label for="r-comentario">Cuéntanos de tu visita (opcional)</label>
+      <textarea id="r-comentario" name="comentario" maxlength="500" rows="4" placeholder="¿Qué te pareció el corte, la atención, el lugar?"></textarea>
+      <label for="r-nombre" style="margin-top:14px">Cómo quieres aparecer</label>
+      <input id="r-nombre" name="nombre" maxlength="40" value="{{nombreSugerido}}" />
+      <p class="muted nota-resena">Tu reseña se publica en el sitio con este nombre. Nunca mostramos tu teléfono ni tu correo.</p>
+      <div id="r-msg"></div>
+      <button class="btn" id="r-enviar" type="submit" style="width:100%">Enviar reseña</button>
+    </form>
+  </section>
+  {{/pendiente}}
+  <section class="card {{#pendiente}}hidden{{/pendiente}}" id="gracias" style="margin-top:40px;text-align:center">
+    <div class="eyebrow">¡Gracias!</div>
+    <h1 class="resena-titulo">Recibimos tu reseña</h1>
+    <p class="muted">Tu opinión nos ayuda a mejorar y a que otros clientes nos conozcan.</p>
+    {{#google}}<p class="muted" style="margin-top:18px">¿Nos ayudas también con una reseña en Google?</p>
+    <a class="btn ghost" href="{{google}}" target="_blank" rel="noopener noreferrer">Opinar en Google</a>{{/google}}
+    <p style="margin-top:22px"><a class="f-link" href="/">Ir al sitio</a></p>
+  </section>
+</main>
+{{#pendiente}}
+<script nonce="{{nonce}}">
+const form = document.getElementById('form-resena');
+const msg = (t) => { document.getElementById('r-msg').innerHTML = t ? '<div class="msg err"></div>' : ''; if (t) document.querySelector('#r-msg .msg').textContent = t; };
+// Las estrellas se iluminan hasta la elegida
+document.getElementById('estrellas').addEventListener('change', () => {
+  const v = Number(form.estrellas.value);
+  document.querySelectorAll('#estrellas label').forEach((l, i) => l.classList.toggle('on', i < v));
+});
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const estrellas = Number(form.estrellas.value);
+  if (!estrellas) return msg('Elige de 1 a 5 estrellas.');
+  const btn = document.getElementById('r-enviar'); btn.disabled = true; msg('');
+  try {
+    const r = await fetch('/api/resenas/{{token}}', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estrellas, comentario: form.comentario.value, nombre: form.nombre.value }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && r.status !== 409) { btn.disabled = false; return msg(d.error || 'No se pudo enviar. Intenta de nuevo.'); }
+    document.getElementById('formulario').classList.add('hidden');
+    document.getElementById('gracias').classList.remove('hidden');
+  } catch { btn.disabled = false; msg('Sin conexión. Intenta de nuevo.'); }
+});
+</script>
+{{/pendiente}}
+</body>
+</html>

@@ -76,6 +76,28 @@ CREATE TABLE IF NOT EXISTS referencias (
   creada TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Visitas que llegan por los enlaces de cada red (/ig, /tt, /fb, /qr): una por persona, canal y día
+CREATE TABLE IF NOT EXISTS visitas (
+  canal TEXT NOT NULL,
+  fecha TEXT NOT NULL,              -- YYYY-MM-DD (hora de México)
+  n INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (canal, fecha)
+);
+
+-- Reseñas verificadas: solo las puede dejar quien pagó una cita, con el enlace único que le llega por correo
+CREATE TABLE IF NOT EXISTS resenas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cita_id INTEGER NOT NULL UNIQUE REFERENCES citas(id),
+  token_hash TEXT NOT NULL UNIQUE,  -- huella SHA-256 del enlace; el enlace mismo no se guarda
+  estrellas INTEGER CHECK (estrellas BETWEEN 1 AND 5),
+  comentario TEXT NOT NULL DEFAULT '',
+  nombre TEXT NOT NULL DEFAULT '',  -- cómo quiere aparecer el cliente (p. ej. "Ana L.")
+  estado TEXT NOT NULL DEFAULT 'pedida',  -- pedida (sin responder) | publicada | oculta
+  pedida_en TEXT NOT NULL DEFAULT (datetime('now')),
+  respondida_en TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_resenas_estado ON resenas (estado);
+
 -- Horario de atención: 0 = domingo ... 6 = sábado. abre/cierra en NULL = cerrado ese día.
 CREATE TABLE IF NOT EXISTS horario (
   dia INTEGER PRIMARY KEY CHECK (dia BETWEEN 0 AND 6),
@@ -89,6 +111,9 @@ const columnas = db.prepare('PRAGMA table_info(citas)').all().map((c) => c.name)
 if (!columnas.includes('recordatorio_en')) db.exec('ALTER TABLE citas ADD COLUMN recordatorio_en TEXT');
 // Cuándo se agregó la cita a la agenda de Google (NULL = aún no está, o ya se quitó)
 if (!columnas.includes('agenda_en')) db.exec('ALTER TABLE citas ADD COLUMN agenda_en TEXT');
+// De qué red llegó el cliente (instagram, tiktok, facebook, qr) y cuándo se le pidió su reseña
+if (!columnas.includes('origen')) db.exec('ALTER TABLE citas ADD COLUMN origen TEXT');
+if (!columnas.includes('resena_pedida_en')) db.exec('ALTER TABLE citas ADD COLUMN resena_pedida_en TEXT');
 const colBarberos = db.prepare('PRAGMA table_info(barberos)').all().map((c) => c.name);
 if (!colBarberos.includes('descripcion')) db.exec("ALTER TABLE barberos ADD COLUMN descripcion TEXT NOT NULL DEFAULT ''");
 
